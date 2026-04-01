@@ -1,0 +1,20 @@
+dwsim_flowsheet.settings:
+  type: mapping
+  label: Settings
+  mapping:
+    dwsim_flowsheet_emails:
+      type: string
+    dwsim_flowsheet_cc_emails:
+      type: string
+    dwsim_flowsheet_from_email:
+      type: string
+    dwsim_flowsheet_user_defind_compound_source_extensions:
+      type: string
+    dwsim_flowsheet_dependency_extensions:
+      type: string
+    dwsim_flowsheet_result_extensions:
+      type: string
+    dwsim_flowsheet_abstract_upload_extensions:
+      type: string
+    dwsim_flowsheet_flowsheet_developed_process_source_extensions:
+      type: string

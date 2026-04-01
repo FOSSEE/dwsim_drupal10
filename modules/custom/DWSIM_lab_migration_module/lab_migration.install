@@ -1,0 +1,435 @@
+<?php
+// $Id$
+/**
+ * Implementation of hook_install().
+ */
+// function lab_migration_install()
+//   {
+//     // Create tables.
+//     drupal_install_schema('lab_migration');
+//     \Drupal::configFactory()->getEditable('lab_migration.settings')->set('lab_migration_emails', '')->save();
+//     \Drupal::configFactory()->getEditable('lab_migration.settings')->set('lab_migration_from_email', '')->save();
+//     \Drupal::configFactory()->getEditable('lab_migration.settings')->set('lab_migration_source_extensions', '')->save();
+//     \Drupal::configFactory()->getEditable('lab_migration.settings')->set('lab_migration_dependency_extensions', '')->save();
+//     \Drupal::configFactory()->getEditable('lab_migration.settings')->set('lab_migration_result_extensions', '')->save();
+//     \Drupal::configFactory()->getEditable('lab_migration.settings')->set('lab_migration_xcos_extensions', '')->save();
+//     // create uploads folder
+//     $upload_path = $_SERVER['DOCUMENT_ROOT'] . base_path() . 'dwsim_uploads/lab_migration_uploads';
+//     if (!is_dir($upload_path))
+//         mkdir($upload_path);
+//     if (!is_dir($upload_path . '/latex'))
+//         mkdir($upload_path . '/latex');
+//     if (!is_dir($upload_path . '/DEPENDENCIES'))
+//         mkdir($upload_path . '/DEPENDENCIES');
+//   }
+// /**
+//  * Implementation of hook_uninstall().
+//  */
+function lab_migration_uninstall()
+  {
+    // Remove tables.
+    drupal_uninstall_schema('lab_migration');
+    // Remove variables
+    \Drupal::config('lab_migration.settings')->clear('lab_migration_emails')->save();
+    \Drupal::config('lab_migration.settings')->clear('lab_migration_from_email')->save();
+    \Drupal::config('lab_migration.settings')->clear('lab_migration_source_extensions')->save();
+    \Drupal::config('lab_migration.settings')->clear('lab_migration_dependency_extensions')->save();
+    \Drupal::config('lab_migration.settings')->clear('lab_migration_result_extensions')->save();
+    \Drupal::config('lab_migration.settings')->clear('lab_migration_xcos_extensions')->save();
+  }
+/**
+ * Implementation of hook_schema().
+ */
+function lab_migration_schema()
+  {
+    /* proposal */
+    $schema['lab_migration_proposal'] = array(
+        'description' => t('TODO: please describe this table!'),
+        'fields' => array(
+            'id' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'serial',
+                'not null' => TRUE
+            ),
+            'uid' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'approver_uid' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'solution_provider_uid' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'name_title' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '5',
+                'not null' => TRUE
+            ),
+            'name' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '255',
+                'not null' => TRUE
+            ),
+            'contact_ph' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '15',
+                'not null' => TRUE
+            ),
+            'department' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '255',
+                'not null' => TRUE
+            ),
+            'university' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '255',
+                'not null' => TRUE
+            ),
+            'lab_title' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '255',
+                'not null' => TRUE
+            ),
+            'category' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'approval_status' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'solution_status' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'solution_display' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'creation_date' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'approval_date' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'solution_date' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'expected_completion_date' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'message' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'text',
+                'size' => 'medium',
+                'not null' => TRUE
+            ),
+            'solution_provider_name_title' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '5',
+                'not null' => TRUE
+            ),
+            'solution_provider_name' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '255',
+                'not null' => TRUE
+            ),
+            'solution_provider_contact_ph' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '15',
+                'not null' => TRUE
+            ),
+            'solution_provider_department' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '255',
+                'not null' => TRUE
+            ),
+            'solution_provider_university' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '255',
+                'not null' => TRUE
+            )
+        ),
+        'primary key' => array(
+            'id'
+        )
+    );
+    /* experiment */
+    $schema['lab_migration_experiment'] = array(
+        'description' => t('TODO: please describe this table!'),
+        'fields' => array(
+            'id' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'serial',
+                'not null' => TRUE
+            ),
+            'proposal_id' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'number' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'title' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '500',
+                'not null' => TRUE
+            )
+        ),
+        'primary key' => array(
+            'id'
+        )
+    );
+    /* solution */
+    $schema['lab_migration_solution'] = array(
+        'description' => t('TODO: please describe this table!'),
+        'fields' => array(
+            'id' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'serial',
+                'not null' => TRUE
+            ),
+            'experiment_id' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'approver_uid' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'code_number' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '10',
+                'not null' => TRUE
+            ),
+            'caption' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '255',
+                'not null' => TRUE
+            ),
+            'approval_date' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'approval_status' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'timestamp' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            )
+        ),
+        'primary key' => array(
+            'id'
+        )
+    );
+    /* solution files */
+    $schema['lab_migration_solution_files'] = array(
+        'description' => t('TODO: please describe this table!'),
+        'fields' => array(
+            'id' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'serial',
+                'not null' => TRUE
+            ),
+            'solution_id' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'filename' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '255',
+                'not null' => TRUE
+            ),
+            'filepath' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '500',
+                'not null' => TRUE
+            ),
+            'filemime' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '255',
+                'not null' => TRUE
+            ),
+            'filesize' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'filetype' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '1',
+                'not null' => TRUE
+            ),
+            'caption' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '100',
+                'not null' => TRUE
+            ),
+            'timestamp' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            )
+        ),
+        'primary key' => array(
+            'id'
+        )
+    );
+    /* depedency files */
+    $schema['lab_migration_dependency_files'] = array(
+        'description' => t('TODO: please describe this table!'),
+        'fields' => array(
+            'id' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'serial',
+                'not null' => TRUE
+            ),
+            'proposal_id' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'filename' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '255',
+                'not null' => TRUE
+            ),
+            'filepath' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '500',
+                'not null' => TRUE
+            ),
+            'filemime' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '255',
+                'not null' => TRUE
+            ),
+            'filesize' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'caption' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'varchar',
+                'length' => '100',
+                'not null' => TRUE
+            ),
+            'description' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'text',
+                'size' => 'medium',
+                'not null' => TRUE
+            ),
+            'timestamp' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            )
+        ),
+        'primary key' => array(
+            'id'
+        )
+    );
+    /* dependency files - links */
+    $schema['lab_migration_solution_dependency'] = array(
+        'description' => t('TODO: please describe this table!'),
+        'fields' => array(
+            'id' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'serial',
+                'not null' => TRUE
+            ),
+            'solution_id' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'dependency_id' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            )
+        ),
+        'primary key' => array(
+            'id'
+        )
+    );
+    /* notes */
+    $schema['lab_migration_notes'] = array(
+        'description' => t('TODO: please describe this table!'),
+        'fields' => array(
+            'id' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'serial',
+                'not null' => TRUE
+            ),
+            'proposal_id' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'int',
+                'not null' => TRUE
+            ),
+            'notes' => array(
+                'description' => t('TODO: please describe this field!'),
+                'type' => 'text',
+                'size' => 'medium',
+                'not null' => TRUE
+            )
+        ),
+        'primary key' => array(
+            'id'
+        )
+    );
+    return $schema;
+  }

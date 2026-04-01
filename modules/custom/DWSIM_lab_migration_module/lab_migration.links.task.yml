@@ -1,0 +1,45 @@
+lab_migration.proposal_pending:
+  route_name: lab_migration.proposal_pending
+  title: 'Pending Proposals'
+  weight: 1
+  base_route: lab_migration.proposal_pending
+lab_migration.solution_proposal_pending:
+  route_name: lab_migration.solution_proposal_pending
+  title: 'Pending Solution Proposals'
+  weight: 2
+  base_route: lab_migration.proposal_pending
+lab_migration.proposal_pending_solution:
+  route_name: lab_migration.proposal_pending_solution
+  title: 'Pending Solution'
+  weight: 3
+  base_route: lab_migration.proposal_pending
+lab_migration.proposal_all:
+  route_name: lab_migration.proposal_all
+  title: 'All Proposals'
+  weight: 4
+  base_route: lab_migration.proposal_pending
+lab_migration.category_all:
+  route_name: lab_migration.category_all
+  title: Category
+  weight: 5
+  base_route: lab_migration.proposal_pending
+lab_migration.code_approval:
+  route_name: lab_migration.code_approval
+  title: 'Code Approval'
+  weight: 1
+  base_route: lab_migration.code_approval
+lab_migration.bulk_approval_form:
+  route_name: lab_migration.bulk_approval_form
+  title: 'Bulk Manage'
+  weight: 2
+  base_route: lab_migration.code_approval
+lab_migration.list_experiments:
+  route_name: lab_migration.list_experiments
+  title: 'List Experiments'
+  weight: 1
+  base_route: lab_migration.list_experiments
+lab_migration.upload_code_form:
+  route_name: lab_migration.upload_code_form
+  title: 'Code Submission'
+  weight: 2
+  base_route: lab_migration.code_approval

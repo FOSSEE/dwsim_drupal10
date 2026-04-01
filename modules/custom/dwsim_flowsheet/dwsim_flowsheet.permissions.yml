@@ -1,0 +1,48 @@
+'dwsim flowsheet create proposal':
+  title: 'dwsim flowsheet create proposal'
+  'restrict access': true
+'dwsim flowsheet manage proposal':
+  title: 'dwsim flowsheet manage proposal'
+  'restrict access': true
+'dwsim flowsheet edit proposal':
+  title: 'dwsim flowsheet edit proposal'
+  'restrict access': true
+'dwsim flowsheet approve proposal':
+  title: 'dwsim flowsheet approve proposal'
+  'restrict access': true
+'dwsim flowsheet propose solution':
+  title: 'dwsim flowsheet propose solution'
+  'restrict access': true
+'dwsim flowsheet approve abstract':
+  title: 'dwsim flowsheet approve code'
+  'restrict access': true
+'dwsim flowsheet bulk manage abstract':
+  title: 'dwsim flowsheet bulk manage abstract'
+  'restrict access': true
+'dwsim flowsheet bulk delete abstract':
+  title: 'dwsim flowsheet bulk delete code'
+  'restrict access': true
+'dwsim flowsheet upload abstract':
+  title: 'dwsim flowsheet upload code'
+  'restrict access': true
+'dwsim flowsheet download abstract':
+  title: 'dwsim flowsheet download code'
+  'restrict access': true
+'dwsim flowsheet download proposals':
+  title: 'dwsim flowsheet download proposals'
+  'restrict access': true
+'administer dwsim flowsheet':
+  title: 'administer dwsim flowsheet'
+  'restrict access': true
+'dwsim flowsheet generate abstract':
+  title: 'dwsim flowsheet generate abstract'
+  'restrict access': true
+'list flowsheet certificates':
+  title: 'list flowsheet certificates'
+  description: 'Allows users to list flowsheet certificates.'
+'list flowsheet custom certificates':
+  title: 'list flowsheet custom certificates'
+  description: 'Allows users to list flowsheet custom certificates.'
+'generate pdf':
+  title: 'Generate pdf'
+  description: 'Allows users to Generate pdf.'

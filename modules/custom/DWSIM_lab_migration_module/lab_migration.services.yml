@@ -1,0 +1,13 @@
+
+services:
+  lab_migration_global:
+    class: '\Drupal\lab_migration\Services\LabMigrationGlobalfunction'
+
+  lab_migration_email:
+    class:  '\Drupal\lab_migration\Services\LabMigrationEmailFunction'
+
+  lab_migration.form.lab_migration_proposal_approval:
+    class: Drupal\lab_migration\Form\LabMigrationProposalApprovalForm
+    arguments: ['@plugin.manager.mail']
+
+  

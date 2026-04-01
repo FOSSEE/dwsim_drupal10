@@ -1,0 +1,155 @@
+lab_migration.proposal_form:
+  route_name: lab_migration.proposal_form
+  title: 'Lab Migration Proposal'
+  description: 'Lab Migration Proposal'
+lab_migration.proposal_pending:
+  route_name: lab_migration.proposal_pending
+  title: 'LM Manage Lab Proposals'
+  description: 'Manage Lab Migration Proposals'
+lab_migration.proposal_pending_0:
+  route_name: lab_migration.proposal_pending
+  title: 'Pending Proposals'
+  weight: 1
+  description: 'Pending Lab Migration Proposals Queue'
+lab_migration.solution_proposal_pending:
+  route_name: lab_migration.solution_proposal_pending
+  title: 'Pending Solution Proposals'
+  weight: 2
+  description: 'Pending Lab Migration Solution Proposals Queue'
+lab_migration.proposal_pending_solution:
+  route_name: lab_migration.proposal_pending_solution
+  title: 'Pending Solution'
+  weight: 3
+  description: 'Pending Lab Migration Solution'
+lab_migration.proposal_all:
+  route_name: lab_migration.proposal_all
+  title: 'All Proposals'
+  weight: 4
+  description: 'All Proposals'
+lab_migration.category_all:
+  route_name: lab_migration.category_all
+  title: Category
+  weight: 5
+  description: Category
+lab_migration.category_edit_form:
+  route_name: lab_migration.category_edit_form
+  title: 'Edit Category'
+  description: 'Edit category'
+  parent: lab_migration.category_all
+lab_migration.proposal_approval_form:
+  route_name: lab_migration.proposal_approval_form
+  title: 'Approve Proposal'
+  description: 'Approve Proposal'
+lab_migration.solution_proposal_approval_form:
+  route_name: lab_migration.solution_proposal_approval_form
+  title: 'Approve Solution Proposal'
+  description: 'Approve Solution Proposal'
+lab_migration.proposal_edit_form:
+  route_name: lab_migration.proposal_edit_form
+  title: 'Edit Proposal'
+  description: 'Edit Proposal'
+lab_migration.proposal_status_form:
+  route_name: lab_migration.proposal_status_form
+  title: 'Proposal Status'
+  description: 'Proposal Status'
+lab_migration.proposal_open:
+  route_name: lab_migration.proposal_open
+  title: 'Lab Migration Solve'
+  description: 'Lab Migration Proposal Open For Solution'
+lab_migration.solution_proposal_form:
+  route_name: lab_migration.solution_proposal_form
+  title: 'Lab Migration Solution Proposal'
+lab_migration.code_approval:
+  route_name: lab_migration.code_approval
+  title: 'LM Manage Code Approval'
+  description: 'Manage Code Approval'
+lab_migration.code_approval_form:
+  route_name: lab_migration.code_approval_form
+  title: 'Code Approval'
+  weight: 1
+  description: 'Code Approval'
+  parent: lab_migration.code_approval
+lab_migration.bulk_approval_form:
+  route_name: lab_migration.bulk_approval_form
+  title: 'Bulk Manage'
+  weight: 2
+  description: 'Bulk Mangage'
+  parent: lab_migration.code_approval
+lab_migration.bulk_upload_code_form:
+  route_name: lab_migration.bulk_upload_code_form
+  title: 'Upload Code'
+  weight: 4
+  description: 'Admin Upload'
+  parent: lab_migration.code_approval
+lab_migration.lab_notes_form:
+  route_name: lab_migration.lab_notes_form
+  title: 'Notes for Reviewers'
+  weight: 4
+  description: 'Notes for Reviewers'
+  parent: lab_migration.code_approval
+lab_migration.list_experiments:
+  route_name: lab_migration.list_experiments
+  title: 'Code Submission'
+  description: 'Code Submission'
+lab_migration.list_experiments_0:
+  route_name: lab_migration.list_experiments
+  title: 'List Experiments'
+  weight: 1
+  description: 'List Experiments'
+lab_migration.upload_code_form:
+  route_name: lab_migration.upload_code_form
+  title: 'Code Submission'
+  weight: 2
+  description: 'Code Submission'
+lab_migration.upload_code_delete:
+  route_name: lab_migration.upload_code_delete
+  title: 'Delete Solution'
+  description: 'Delete Solution'
+lab_migration.download_solution_file:
+  route_name: lab_migration.download_solution_file
+  title: 'Code Download'
+  description: 'Code Download'
+lab_migration.download_solution:
+  route_name: lab_migration.download_solution
+  title: 'Code Download'
+  description: 'Code Download'
+lab_migration.download_experiment:
+  route_name: lab_migration.download_experiment
+  title: 'Code Download'
+  description: 'Code Download'
+lab_migration.download_lab:
+  route_name: lab_migration.download_lab
+  title: 'Code Download'
+  description: 'Code Download'
+lab_migration.download_full_experiment:
+  route_name: lab_migration.download_full_experiment
+  title: 'Code Download'
+  description: 'Code Download'
+lab_migration.download_full_lab:
+  route_name: lab_migration.download_full_lab
+  title: 'Code Download'
+  description: 'Code Download'
+lab_migration.completed_labs_all:
+  route_name: lab_migration.completed_labs_all
+  title: 'Completed Labs'
+lab_migration.labs_progress_all:
+  route_name: lab_migration.labs_progress_all
+  title: 'Labs in Progress'
+lab_migration.run_form:
+  route_name: lab_migration.run_form
+  title: 'Download Codes'
+lab_migration.download_lab_pdf:
+  route_name: lab_migration.download_lab_pdf
+  title: 'Generate Lab'
+  description: 'Generate Lab From Latex Script'
+lab_migration.delete_lab_pdf:
+  route_name: lab_migration.delete_lab_pdf
+  title: 'Delete Lab PDF'
+  description: 'Delete Lab PDF'
+lab_migration.settings_form:
+  route_name: lab_migration.settings_form
+  title: 'Lab Migration Settings'
+  description: 'Lab Migration Settings'
+lab_migration.lab_bulk_manage_exp_ajax:
+  route_name: lab_migration.lab_bulk_manage_exp_ajax
+  title: 'Ajax callbacks'

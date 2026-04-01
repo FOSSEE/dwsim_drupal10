@@ -1,0 +1,50 @@
+dwsim_flowsheet.proposal_pending:
+  route_name: dwsim_flowsheet.proposal_pending
+  title: 'Pending Proposals'
+  weight: 1
+  description: 'Pending dwsim flowsheet Proposals Queue'
+  base_route: dwsim_flowsheet.proposal_pending
+dwsim_flowsheet.proposal_all:
+  route_name: dwsim_flowsheet.proposal_all
+  title: 'All Proposals'
+  weight: 2
+  description: 'All Proposals'
+  base_route: dwsim_flowsheet.proposal_pending
+dwsim_flowsheet.approved_tab:
+  route_name: dwsim_flowsheet.approved_tab
+  title: 'Approved Proposals'
+  weight: 3
+  description: 'Approved Proposals'
+  base_route: dwsim_flowsheet.proposal_pending
+dwsim_flowsheet.uploaded_tab:
+  route_name: dwsim_flowsheet.uploaded_tab
+  title: 'Uploaded Proposals'
+  weight: 4
+  description: 'Uploaded Proposals'
+  base_route: dwsim_flowsheet.proposal_pending
+dwsim_flowsheet.completed_tab_form:
+  route_name: dwsim_flowsheet.completed_tab_form
+  title: 'Completed Proposals'
+  weight: 5
+  description: 'Completed Proposals'
+  base_route: dwsim_flowsheet.proposal_pending
+dwsim_flowsheet.abstract_approval_form:
+  route_name: dwsim_flowsheet.abstract_approval_form
+  title: 'Code Approval'
+  weight: 1
+  description: 'Code Approval'
+dwsim_flowsheet.abstract_bulk_approval_form:
+  route_name: dwsim_flowsheet.abstract_bulk_approval_form
+  title: 'Bulk Manage'
+  weight: 2
+  description: 'Bulk Mangage'
+dwsim_flowsheet.abstract_0:
+  route_name: dwsim_flowsheet.abstract
+  title: 'Flowsheet project'
+  weight: 1
+  description: 'List Experiments'
+dwsim_flowsheet.upload_abstract_code_form:
+  route_name: dwsim_flowsheet.upload_abstract_code_form
+  title: 'Abstract and Flowsheet Submission'
+  weight: 2
+  description: 'Abstract Submission'

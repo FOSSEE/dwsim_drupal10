@@ -1,0 +1,36 @@
+'lab migration create proposal':
+  title: 'lab migration create proposal'
+  'restrict access': true
+'lab migration manage proposal':
+  title: 'lab migration manage proposal'
+  'restrict access': true
+'lab migration edit proposal':
+  title: 'lab migration edit proposal'
+  'restrict access': true
+'lab migration approve proposal':
+  title: 'lab migration approve proposal'
+  'restrict access': true
+'lab migration propose solution':
+  title: 'lab migration propose solution'
+  'restrict access': true
+'lab migration approve code':
+  title: 'lab migration approve code'
+  'restrict access': true
+'lab migration bulk manage code':
+  title: 'lab migration bulk manage code'
+  'restrict access': true
+'lab migration bulk delete code':
+  title: 'lab migration bulk delete code'
+  'restrict access': true
+'lab migration upload code':
+  title: 'lab migration upload code'
+  'restrict access': true
+'lab migration download code':
+  title: 'lab migration download code'
+  'restrict access': true
+'administer lab migration':
+  title: 'administer lab migration'
+  'restrict access': true
+'lab migration generate lab':
+  title: 'lab migration generate lab'
+  'restrict access': true

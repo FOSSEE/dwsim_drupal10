@@ -1,0 +1,3 @@
+services:
+  dwsim_flowsheet_global:
+    class: '\Drupal\dwsim_flowsheet\Services\DwsimFlowsheetGlobalFunction'

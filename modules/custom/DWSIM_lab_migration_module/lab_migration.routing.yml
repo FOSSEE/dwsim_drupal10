@@ -1,0 +1,275 @@
+lab_migration.proposal_form:
+  path: /lab-migration/proposal
+  defaults:
+    _title: 'Lab Migration Proposal'
+    _form: \Drupal\lab_migration\Form\LabMigrationProposalForm
+  requirements:
+    _permission: 'lab migration create proposal'
+lab_migration.proposal_pending:
+  path: /lab-migration/manage-proposal/pending
+  defaults:
+    _title: 'Pending Proposals'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_proposal_pending'
+  requirements:
+    _permission: 'lab migration manage proposal'
+  options:
+    no_cache: TRUE
+lab_migration.solution_proposal_pending:
+  path: /lab-migration/manage-proposal/pending-solution-proposal
+  defaults:
+    _title: 'Pending Solution Proposals'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_solution_proposal_pending'
+  requirements: 
+    _permission: 'lab migration manage proposal'
+  options:
+    no_cache: TRUE
+lab_migration.proposal_pending_solution:
+  path: /lab-migration/manage-proposal/pending-solution
+  defaults:
+    _title: 'Pending Solution'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_proposal_pending_solution'
+  requirements:
+    _permission: 'lab migration manage proposal'
+  options:
+    no_cache: TRUE
+lab_migration.proposal_all:
+  path: /lab-migration/manage-proposal/all
+  defaults:
+    _title: 'All Proposals'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_proposal_all'
+  requirements:
+    _permission: 'lab migration manage proposal'
+  options:
+    no_cache: TRUE
+lab_migration.category_all:
+  path: /lab-migration/manage-proposal/category
+  defaults:
+    _title: Category
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_category_all'
+  requirements:
+    _permission: 'lab migration manage proposal'
+  options:
+    no_cache: TRUE
+lab_migration.category_edit_form:
+  path: /lab-migration/manage-proposal/category/edit/{id}
+  defaults:
+    _title: 'Edit Category'
+    _form: \Drupal\lab_migration\Form\LabMigrationCategoryEditForm
+  requirements:
+    _permission: 'lab migration edit proposal'
+lab_migration.proposal_approval_form:
+  path: /lab-migration/manage-proposal/approve/{id}
+  defaults:
+    _title: 'Approve Proposal'
+    _form: \Drupal\lab_migration\Form\LabMigrationProposalApprovalForm
+  requirements:
+    _permission: 'lab migration manage proposal'
+lab_migration.solution_proposal_approval_form:
+  path: /lab-migration/manage-proposal/solution-proposal-approve
+  defaults:
+    _title: 'Approve Solution Proposal'
+    _form: \Drupal\lab_migration\Form\LabMigrationSolutionProposalApprovalForm
+  requirements:
+    _permission: 'lab migration manage proposal'
+lab_migration.proposal_edit_form:
+  path: /lab-migration/manage-proposal/edit/{id}
+  defaults:
+    _title: 'Edit Proposal'
+    _form: \Drupal\lab_migration\Form\LabMigrationProposalEditForm
+  requirements:
+    _permission: 'lab migration manage proposal'
+lab_migration.proposal_status_form:
+  path: /lab-migration/manage-proposal/status/{id}
+  defaults:
+    _title: 'Proposal Status'
+    _form: \Drupal\lab_migration\Form\LabMigrationProposalStatusForm
+  requirements:
+    _permission: 'lab migration approve proposal'
+lab_migration.proposal_open:
+  path: /lab-migration/open-proposal
+  defaults:
+    _title: 'Lab Migration Solve'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_proposal_open'
+  requirements:
+    _permission: 'lab migration propose solution'
+  options:
+    no_cache: TRUE
+lab_migration.solution_proposal_form:
+  path: /lab-migration/show-proposal/{id}
+  defaults:
+    _title: 'Lab Migration Solution Proposal'
+    _form: \Drupal\lab_migration\Form\LabMigrationSolutionProposalForm
+  requirements:
+    _permission: 'lab migration propose solution'
+lab_migration.code_approval:
+  path: /lab-migration/code-approval
+  defaults:
+    _title: 'LM Manage Code Approval'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_code_approval'
+  requirements:
+    _permission: 'lab migration approve code'
+  options:
+    no_cache: TRUE
+lab_migration.code_approval_form:
+  path: /lab-migration/code-approval/approve/{solution_id}
+  defaults:
+    _title: 'Code Approval'
+    _form: \Drupal\lab_migration\Form\LabMigrationCodeApprovalForm
+  requirements:
+    _permission: 'lab migration approve code'
+lab_migration.bulk_approval_form:
+  path: /lab-migration/code-approval/bulk
+  defaults:
+    _title: 'Bulk Manage'
+    _form: \Drupal\lab_migration\Form\LabMigrationBulkApprovalForm
+  requirements:
+    _permission: 'lab migration bulk manage code'
+lab_migration.bulk_upload_code_form:
+  path: /lab-migration/code-approval/upload
+  defaults:
+    _title: 'Upload Code'
+    _form: \Drupal\lab_migration\Form\LabMigrationBulkUploadCodeForm
+  requirements:
+    _permission: 'lab migration bulk manage code'
+lab_migration.lab_notes_form:
+  path: /lab-migration/code-approval/notes
+  defaults:
+    _title: 'Notes for Reviewers'
+    _form: \Drupal\lab_migration\Form\LabMigrationLabNotesForm
+  requirements:
+    _permission: 'lab migration bulk manage code'
+lab_migration.list_experiments:
+  path: /lab-migration/code/list-experiments
+  defaults:
+    _title: 'List Experiments'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_list_experiments'
+  requirements:
+    _permission: 'lab migration upload code'
+  options:
+    no_cache: TRUE
+lab_migration.upload_code_form:
+  path: /lab-migration/code/upload
+  defaults:
+    _title: 'Code Submission'
+    _form: \Drupal\lab_migration\Form\LabMigrationUploadCodeForm
+  requirements:
+    _permission: 'lab migration upload code'
+lab_migration.upload_code_delete:
+  path: /lab-migration/code/delete/{solution_id}
+  defaults:
+    _title: 'Delete Solution'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_upload_code_delete'
+  requirements:
+    _permission: 'lab migration upload code'
+  options:
+    no_cache: TRUE
+lab_migration.download_solution_file:
+  path: /lab-migration/download/file/{solution_file_id}
+  defaults:
+    _title: 'Code Download'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_download_solution_file'
+  requirements:
+    _permission: 'lab migration download code'
+  options:
+    no_cache: TRUE
+lab_migration.download_solution:
+  path: /lab-migration/download/solution/{solution_id}
+  defaults:
+    _title: 'Code Download'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_download_solution'
+  requirements:
+    _permission: 'lab migration download code'
+  options:
+    no_cache: TRUE
+lab_migration.download_experiment:
+  path: /lab-migration/download/experiment/{experiment_id}
+  defaults:
+    _title: 'Code Download'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_download_experiment'
+  requirements:
+    _permission: 'lab migration download code'
+  options:
+    no_cache: TRUE
+lab_migration.download_lab:
+  path: /lab-migration/download/lab/{lab_id}
+  defaults:
+    _title: 'Code Download'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_download_lab'
+  requirements:
+    _permission: 'lab migration download code'
+  options:
+    no_cache: TRUE
+lab_migration.download_full_experiment:
+  path: /lab-migration/full-download/experiment
+  defaults:
+    _title: 'Code Download'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_download_full_experiment'
+  requirements:
+    _permission: 'lab migration approve code'
+  options:
+    no_cache: TRUE
+lab_migration.download_full_lab:
+  path: /lab-migration/full-download/lab/{lab_id}
+  defaults:
+    _title: 'Code Download'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_download_full_lab'
+  requirements:
+    _permission: 'lab migration approve code'
+  options:
+    no_cache: TRUE
+lab_migration.completed_labs_all:
+  path: /lab-migration/completed-labs
+  defaults:
+    _title: 'Completed Labs'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_completed_labs_all'
+  requirements:
+    _permission: 'lab migration download code'
+  options:
+    no_cache: TRUE
+lab_migration.labs_progress_all:
+  path: /lab-migration/labs-progress
+  defaults:
+    _title: 'Labs in Progress'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_labs_progress_all'
+  requirements:
+    _permission: 'lab migration download code'
+  options:
+    no_cache: TRUE
+lab_migration.run_form:
+  path: /lab-migration/lab-migration-run/{url_lab_id?}
+  defaults:
+    _title: 'Download Codes'
+    _form: \Drupal\lab_migration\Form\LabMigrationRunForm
+  requirements:
+    _permission: 'lab migration download code'
+lab_migration.download_lab_pdf:
+  path: /lab-migration/generate-lab
+  defaults:
+    _title: 'Generate Lab'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_download_lab_pdf'
+  requirements:
+    _permission: 'lab migration generate lab'
+  options:
+    no_cache: TRUE
+lab_migration.delete_lab_pdf:
+  path: /lab-migration/delete-lab
+  defaults:
+    _title: 'Delete Lab PDF'
+    _controller: '\Drupal\lab_migration\Controller\DefaultController::lab_migration_delete_lab_pdf'
+  requirements:
+    _permission: 'lab migration approve code'
+  options:
+    no_cache: TRUE
+lab_migration.settings_form:
+  path: /admin/settings/lab-migration
+  defaults:
+    _title: 'Lab Migration Settings'
+    _form: \Drupal\lab_migration\Form\LabMigrationSettingsForm
+  requirements:
+    _permission: 'administer lab migration'
+lab_migration.lab_bulk_manage_exp_ajax:
+  path: /lab-bulk-manage-exp/ajax
+  defaults:
+    _title: 'Ajax callbacks'
+  requirements:
+    _permission: 'lab migration bulk manage code'

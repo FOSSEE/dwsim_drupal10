@@ -1,0 +1,193 @@
+dwsim_flowsheet.proposal_form:
+  path: /flowsheeting-project/proposal
+  defaults:
+    _title: 'Flowsheet Proposal Form'
+    _form: \Drupal\dwsim_flowsheet\Form\DwsimFlowsheetProposalForm
+  requirements:
+    _permission: 'dwsim flowsheet create proposal'
+dwsim_flowsheet.proposal_pending_0:
+  path: /flowsheeting-project/manage-proposal
+  defaults:
+    _title: 'Manage Flowsheet Proposals'
+    _controller: '\Drupal\dwsim_flowsheet\Controller\DefaultController::dwsim_flowsheet_proposal_pending'
+  requirements:
+    _permission: 'dwsim flowsheet manage proposal'
+dwsim_flowsheet.proposal_pending:
+  path: /flowsheeting-project/manage-proposal/pending
+  defaults:
+    _title: 'Pending Proposals'
+    _controller: '\Drupal\dwsim_flowsheet\Controller\DefaultController::dwsim_flowsheet_proposal_pending'
+  requirements:
+    _permission: 'dwsim flowsheet manage proposal'
+  options:
+    no_cache: TRUE
+dwsim_flowsheet.proposal_all:
+  path: /flowsheeting-project/manage-proposal/all
+  defaults:
+    _title: 'All Proposals'
+    _controller: '\Drupal\dwsim_flowsheet\Controller\DefaultController::dwsim_flowsheet_proposal_all'
+  requirements:
+    _permission: 'dwsim flowsheet manage proposal'
+  options:
+    no_cache: TRUE
+dwsim_flowsheet.approved_tab:
+  path: /flowsheeting-project/manage-proposal/approved_proposals
+  defaults:
+    _title: 'Approved Proposals'
+    _controller: '\Drupal\dwsim_flowsheet\Controller\DefaultController::dwsim_flowsheet_approved_tab'
+  requirements:
+    _permission: 'dwsim flowsheet manage proposal'
+dwsim_flowsheet.uploaded_tab:
+  path: /flowsheeting-project/manage-proposal/uploaded_proposals
+  defaults:
+    _title: 'Uploaded Proposals'
+    _controller: '\Drupal\dwsim_flowsheet\Controller\DefaultController::dwsim_flowsheet_uploaded_tab'
+  requirements:
+    _permission: 'dwsim flowsheet manage proposal'
+dwsim_flowsheet.completed_tab_form:
+  path: /flowsheeting-project/manage-proposal/completed_proposals
+  defaults:
+    _title: 'Completed Proposals'
+    _form: \Drupal\dwsim_flowsheet\Form\DwsimFlowsheetCompletedTabForm
+  requirements:
+    _permission: 'dwsim flowsheet manage proposal'
+dwsim_flowsheet.proposal_approval_form:
+  path: /flowsheeting-project/manage-proposal/approve/{id}
+  defaults:
+    _title: 'Approve Proposal'
+    _form: \Drupal\dwsim_flowsheet\Form\DwsimFlowsheetProposalApprovalForm
+  requirements:
+    _permission: 'dwsim flowsheet manage proposal'
+dwsim_flowsheet.proposal_edit_form:
+  path: /flowsheeting-project/manage-proposal/edit/{proposal_id}
+  defaults:
+    _title: 'Edit Proposal'
+    _form: \Drupal\dwsim_flowsheet\Form\DwsimFlowsheetProposalEditForm
+  requirements:
+    _permission: 'dwsim flowsheet manage proposal'
+dwsim_flowsheet.proposal_status_form:
+  path: /flowsheeting-project/manage-proposal/status/{id?}
+  defaults:
+    _title: 'Proposal Status'
+    _form: \Drupal\dwsim_flowsheet\Form\DwsimFlowsheetProposalStatusForm
+  requirements:
+    _permission: 'dwsim flowsheet approve proposal'
+dwsim_flowsheet.abstract_approval_form:
+  path: /flowsheeting-project/abstract-approval/approve
+  defaults:
+    _title: 'Code Approval'
+    _form: \Drupal\dwsim_flowsheet\Form\DwsimFlowsheetAbstractApprovalForm
+  requirements:
+    _permission: 'dwsim flowsheet approve code'
+dwsim_flowsheet.abstract_bulk_approval_form:
+  path: /flowsheeting-project/abstract-approval/bulk
+  defaults:
+    _title: 'Bulk Manage'
+    _form: \Drupal\dwsim_flowsheet\Form\DwsimFlowsheetAbstractBulkApprovalForm
+  requirements:
+    _permission: 'dwsim flowsheet bulk manage abstract'
+dwsim_flowsheet.abstract:
+  path: /flowsheeting-project/abstract-code
+  defaults:
+    _title: 'Flowsheet project'
+    _controller: '\Drupal\dwsim_flowsheet\Controller\DefaultController::dwsim_flowsheet_abstract'
+  requirements:
+    _permission: 'dwsim flowsheet upload code'
+dwsim_flowsheet.upload_abstract_code_form:
+  path: /flowsheeting-project/abstract-code/upload
+  defaults:
+    _title: 'Abstract and Flowsheet Submission'
+    _form: \Drupal\dwsim_flowsheet\Form\DwsimFlowsheetUploadAbstractCodeForm
+  requirements:
+    _permission: 'dwsim flowsheet upload code'
+dwsim_flowsheet.download_solution_file:
+  path: /flowsheeting-project/download/file
+  defaults:
+    _title: 'Code Download'
+    _controller: '\Drupal\dwsim_flowsheet\Controller\DefaultController::dwsim_flowsheet_download_solution_file'
+  requirements:
+    _permission: 'dwsim flowsheet download code'
+dwsim_flowsheet.download_abstract:
+  path: /flowsheeting-project/download/project-file/{proposal_id}
+  defaults:
+    _title: 'Code Download'
+    _controller: '\Drupal\dwsim_flowsheet\Controller\DefaultController::dwsim_flowsheet_download_abstract'
+  requirements:
+    _permission: 'dwsim flowsheet download code'
+dwsim_flowsheet.download_solution:
+  path: /flowsheeting-project/download/solution
+  defaults:
+    _title: 'Code Download'
+    _controller: '\Drupal\dwsim_flowsheet\Controller\DefaultController::dwsim_flowsheet_download_solution'
+  requirements:
+    _permission: 'dwsim flowsheet download code'
+dwsim_flowsheet.download_experiment:
+  path: /flowsheeting-project/download/experiment
+  defaults:
+    _title: 'Code Download'
+    _controller: '\Drupal\dwsim_flowsheet\Controller\DefaultController::dwsim_flowsheet_download_experiment'
+  requirements:
+    _permission: 'dwsim flowsheet download code'
+dwsim_flowsheet.download_lab:
+  path: /flowsheeting-project/download/lab
+  defaults:
+    _title: 'Code Download'
+    _controller: '\Drupal\dwsim_flowsheet\Controller\DefaultController::dwsim_flowsheet_download_lab'
+  requirements:
+    _permission: 'dwsim flowsheet download code'
+dwsim_flowsheet.download_full_project:
+  path: /flowsheeting-project/full-download/project/{proposal_id}
+  defaults:
+    _title: 'Code Download'
+    _controller: '\Drupal\dwsim_flowsheet\Controller\DefaultController::dwsim_flowsheet_download_full_project'
+  requirements:
+    _permission: 'dwsim flowsheet download code'
+dwsim_flowsheet.download_completed_proposals:
+  path: /flowsheeting-project/download-proposals
+  defaults:
+    _title: 'Download Proposals'
+    _controller: '\Drupal\dwsim_flowsheet\Controller\DefaultController::dwsim_flowsheet_download_completed_proposals'
+  requirements:
+    _permission: 'dwsim flowsheet download proposals'
+dwsim_flowsheet.download_proposals:
+  path: /flowsheeting-project/download-proposals-all
+  defaults:
+    _title: 'Download Proposals'
+    _controller: '\Drupal\dwsim_flowsheet\Controller\DefaultController::dwsim_flowsheet_download_proposals'
+  requirements:
+    _permission: 'dwsim flowsheet download proposals'
+dwsim_flowsheet.completed_proposals_all:
+  path: /flowsheeting-project/completed-flowsheet
+  defaults:
+    _title: 'Completed Flowsheets'
+    _controller: '\Drupal\dwsim_flowsheet\Controller\DefaultController::dwsim_flowsheet_completed_proposals_all'
+  requirements:
+    _permission: 'dwsim flowsheet download code'
+dwsim_flowsheet.progress_all:
+  path: /flowsheeting-project/flowsheet-progress
+  defaults:
+    _title: 'Flowsheets in Progress'
+    _controller: '\Drupal\dwsim_flowsheet\Controller\DefaultController::dwsim_flowsheet_progress_all'
+  requirements:
+    _permission: 'dwsim flowsheet download code'
+dwsim_flowsheet.run_form:
+  path: /flowsheeting-project/dwsim-flowsheet-run/{id?}
+  defaults:
+    _title: 'Download Codes'
+    _form: \Drupal\dwsim_flowsheet\Form\DwsimFlowsheetRunForm
+  requirements:
+    _permission: 'dwsim flowsheet download code'
+dwsim_flowsheet.download_user_defined_compound:
+  path: /flowsheeting-project/download/user-defined-compound-file/{proposal_id?}
+  defaults:
+    _title: 'Download user defined compound file'
+    _controller: '\Drupal\dwsim_flowsheet\Controller\DefaultController::dwsim_flowsheet_download_user_defined_compound'
+  requirements:
+    _permission: 'download code'
+dwsim_flowsheet.settings_form:
+  path: /admin/settings/dwsim-flowsheet
+  defaults:
+    _title: 'dwsim flowsheet Settings'
+    _form: \Drupal\dwsim_flowsheet\Form\DwsimFlowsheetSettingsForm
+  requirements:
+    _permission: 'administer dwsim flowsheet'
