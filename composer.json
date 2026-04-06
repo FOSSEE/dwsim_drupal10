@@ -47,7 +47,6 @@
         "drupal/masquerade": "^2.0",
         "drupal/mathjax": "^4.1",
         "drupal/migrate_plus": "^6.0",
-        "drupal/nava": "^1.0",
         "drupal/rdf": "^3.0@beta",
         "drupal/scheduled_maintenance": "^2.0",
         "drupal/spambot": "^1.4",
