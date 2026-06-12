@@ -18,7 +18,46 @@ use Drupal\Core\Link;
 use Drupal\Core\Url;
 use Drupal\Core\Render\RendererInterface;
 
+use Drupal\dwsim_flowsheet\Services\MailService;
+use Drupal\dwsim_flowsheet\Services\AjaxHelper;
+use Drupal\Core\DependencyInjection\ContainerInterface;
+
 class DwsimFlowsheetAbstractBulkApprovalForm extends FormBase {
+
+  /**
+   * The mail helper service.
+   *
+   * @var \Drupal\dwsim_flowsheet\Services\MailService
+   */
+  protected $mailHelper;
+
+  /**
+   * The ajax response helper service.
+   *
+   * @var \Drupal\dwsim_flowsheet\Services\AjaxHelper
+   */
+  protected $ajaxHelper;
+
+  /**
+   * Constructs a DwsimFlowsheetAbstractBulkApprovalForm object.
+   *
+   * @param \Drupal\dwsim_flowsheet\Services\MailService $mail_helper
+   * @param \Drupal\dwsim_flowsheet\Services\AjaxHelper $ajax_helper
+   */
+  public function __construct(MailService $mail_helper, AjaxHelper $ajax_helper) {
+    $this->mailHelper = $mail_helper;
+    $this->ajaxHelper = $ajax_helper;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('dwsim_flowsheet.mail_helper'),
+      $container->get('dwsim_flowsheet.ajax_helper')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -91,25 +130,19 @@ class DwsimFlowsheetAbstractBulkApprovalForm extends FormBase {
 
   
   function ajax_bulk_flowsheet_abstract_details_callback(array &$form, FormStateInterface $form_state) {
-    $response = new AjaxResponse();
-  
     $flowsheet_project_default_value = $form_state->getValue('flowsheet_project');
   
     if ($flowsheet_project_default_value != 0) {
-      // Update the selected flowsheet details.
       $details_html = $this->_flowsheet_details($flowsheet_project_default_value);
-      $response->addCommand(new HtmlCommand('#ajax_selected_flowsheet', $details_html));
-  
-      // Update the flowsheet actions dropdown.
       $form['flowsheet_actions']['#options'] = $this->_bulk_list_flowsheet_actions();
-      $flowsheet_actions_rendered = \Drupal::service('renderer')->render($form['flowsheet_actions']);
-      $response->addCommand(new ReplaceCommand('#ajax_selected_flowsheet_action', $flowsheet_actions_rendered));
+      
+      return $this->ajaxHelper->buildMultiCommandResponse([
+        '#ajax_selected_flowsheet' => ['type' => 'html', 'content' => $details_html],
+        '#ajax_selected_flowsheet_action' => ['type' => 'replace', 'content' => $form['flowsheet_actions']],
+      ]);
     } else {
-      // Clear the selected flowsheet details and flowsheet actions.
-      $response->addCommand(new HtmlCommand('#ajax_selected_flowsheet', ''));
+      return $this->ajaxHelper->htmlWrapper('#ajax_selected_flowsheet', '');
     }
-  
-    return $response;
   }
   public function submitForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
     $user = \Drupal::currentUser();
@@ -185,33 +218,14 @@ class DwsimFlowsheetAbstractBulkApprovalForm extends FormBase {
             // 					);
 
             /** sending email when everything done **/
-            $email_to = $user_data->mail;
-            $from = \Drupal::config('dwsim_flowsheet.settings')->get('dwsim_flowsheet_from_email');
-            $bcc = \Drupal::config('dwsim_flowsheet.settings')->get('dwsim_flowsheet_emails');
-            $cc = \Drupal::config('dwsim_flowsheet.settings')->get('dwsim_flowsheet_cc_emails');
-            $params['standard']['subject'] = $email_subject ?? NULL;
-            $params['standard']['body'] = $email_body ?? NULL;
-            $params['standard']['headers'] = [
-              'From' => $from,
-              'MIME-Version' => '1.0',
-              'Content-Type' => 'text/plain; charset=UTF-8; format=flowed; delsp=yes',
-              'Content-Transfer-Encoding' => '8Bit',
-              'X-Mailer' => 'Drupal',
-              'Cc' => $cc,
-              'Bcc' => $bcc,
-            ];
-            $mail_result = \Drupal::service('plugin.manager.mail')->mail(
+            $email_to = $user_data->getEmail();
+            $this->mailHelper->sendNotification(
               'dwsim_flowsheet',
               'standard',
               $email_to,
-              $langcode,
-              $params,
-              $from,
-              TRUE
+              $email_subject ?? NULL,
+              $email_body ?? NULL
             );
-            if (empty($mail_result['result'])) {
-              $msg = \Drupal::messenger()->addError('Error sending email message.');
-            }
           } //$form_state['values']['flowsheet_actions'] == 1
           elseif ($form_state->getValue(['flowsheet_actions']) == 2) {
             //pending review entire project 
@@ -263,33 +277,14 @@ class DwsimFlowsheetAbstractBulkApprovalForm extends FormBase {
             // 					);
 
             /** sending email when everything done **/
-            $email_to = $user_data->mail;
-            $from = \Drupal::config('dwsim_flowsheet.settings')->get('dwsim_flowsheet_from_email');
-            $bcc = \Drupal::config('dwsim_flowsheet.settings')->get('dwsim_flowsheet_emails');
-            $cc = \Drupal::config('dwsim_flowsheet.settings')->get('dwsim_flowsheet_cc_emails');
-            $params['standard']['subject'] = $email_subject ?? NULL;
-            $params['standard']['body'] = $email_body ?? NULL;
-            $params['standard']['headers'] = [
-              'From' => $from,
-              'MIME-Version' => '1.0',
-              'Content-Type' => 'text/plain; charset=UTF-8; format=flowed; delsp=yes',
-              'Content-Transfer-Encoding' => '8Bit',
-              'X-Mailer' => 'Drupal',
-              'Cc' => $cc,
-              'Bcc' => $bcc,
-            ];
-            $mail_result = \Drupal::service('plugin.manager.mail')->mail(
+            $email_to = $user_data->getEmail();
+            $this->mailHelper->sendNotification(
               'dwsim_flowsheet',
               'standard',
               $email_to,
-              $langcode,
-              $params,
-              $from,
-              TRUE
+              $email_subject ?? NULL,
+              $email_body ?? NULL
             );
-            if (empty($mail_result['result'])) {
-              \Drupal::messenger()->addError('Error sending email message.');
-            }
           } //$form_state['values']['flowsheet_actions'] == 2
           elseif ($form_state->getValue(['flowsheet_actions']) == 3) //disapprove and delete entire flowsheeting project
  {
@@ -338,33 +333,14 @@ class DwsimFlowsheetAbstractBulkApprovalForm extends FormBase {
               // 					))
               // 						);
 
-              $email_to = $user_data->mail;
-              $from = \Drupal::config('dwsim_flowsheet.settings')->get('dwsim_flowsheet_from_email');
-              $bcc = \Drupal::config('dwsim_flowsheet.settings')->get('dwsim_flowsheet_emails');
-              $cc = \Drupal::config('dwsim_flowsheet.settings')->get('dwsim_flowsheet_cc_emails');
-              $params['standard']['subject'] = $email_subject ?? NULL;
-              $params['standard']['body'] = $email_body ?? NULL;
-              $params['standard']['headers'] = [
-                'From' => $from,
-                'MIME-Version' => '1.0',
-                'Content-Type' => 'text/plain; charset=UTF-8; format=flowed; delsp=yes',
-                'Content-Transfer-Encoding' => '8Bit',
-                'X-Mailer' => 'Drupal',
-                'Cc' => $cc,
-                'Bcc' => $bcc,
-              ];
-              $mail_result = \Drupal::service('plugin.manager.mail')->mail(
+              $email_to = $user_data->getEmail();
+              $this->mailHelper->sendNotification(
                 'dwsim_flowsheet',
                 'standard',
                 $email_to,
-                $langcode,
-                $params,
-                $from,
-                TRUE
+                $email_subject ?? NULL,
+                $email_body ?? NULL
               );
-              if (empty($mail_result['result'])) {
-                \Drupal::messenger()->addError('Error sending email message.');
-              }
             } //dwsim_flowsheet_abstract_delete_project($form_state['values']['flowsheet_project'])
             else {
               \Drupal::messenger()->addError(t('Error Dis-Approving and Deleting Entire flowsheeting project.'));
@@ -588,7 +564,7 @@ $download_flowsheet = Link::fromTextAndUrl('Download flowsheet project', $route_
   $return_html .= '<strong>Unit Operations used in DWSIM:</strong><br />' . $unit_operations_used_in_dwsim . '<br /><br />';
   $return_html .= '<strong>Thermodynamic Packages Used:</strong><br />' . $thermodynamic_packages_used . '<br /><br />';
   $return_html .= '<strong>Logical Blocks used:</strong><br />' . $logical_blocks_used . '<br /><br />';
-  $return_html .= '<strong>Name of compound for which process development is carried out:</strong><br />' . render($prodata) . '<br />';
+  $return_html .= '<strong>Name of compound for which process development is carried out:</strong><br />' . \Drupal::service('renderer')->render($prodata) . '<br />';
   $return_html .= '<strong>List of compounds from DWSIM Database used in process flowsheet:</strong><br />' . $abstracts_pro->dwsim_database_compound_name . '<br /><br />';
   $return_html .= '<strong>Uploaded an abstract (brief outline) of the project:</strong><br />' . $abstract_filename . '<br /><br />';
   $return_html .= '<strong>Upload the DWSIM flowsheet for the developed process:</strong><br />' . $abstracts_query_process_filename . '<br /><br />';

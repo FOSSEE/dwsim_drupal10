@@ -19,7 +19,7 @@ use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\Database\Database;
 use Drupal\Core\Messenger\MessengerInterface;
-use Drupal\Core\Mail\MailManager;
+use Drupal\Core\Mail\MailManagerInterface;
 
 class DwsimFlowsheetUploadAbstractCodeForm extends FormBase {
 
@@ -313,11 +313,9 @@ class DwsimFlowsheetUploadAbstractCodeForm extends FormBase {
         '#type' => 'submit',
         '#value' => t('Add more compounds'),
         '#limit_validation_errors' => [],
-        '#submit' => [
-          'user_defined_compounds_add_more_add_one'
-          ],
+        '#submit' => [[$this, 'userDefinedCompoundsAddOne']],
         '#ajax' => [
-          'callback' => 'user_defined_compounds_add_more_callback',
+          'callback' => [$this, 'userDefinedCompoundsAjaxCallback'],
           'wrapper' => 'user-defined-compounds-fieldset-wrapper',
         ],
       ];
@@ -326,13 +324,11 @@ class DwsimFlowsheetUploadAbstractCodeForm extends FormBase {
           '#type' => 'submit',
           '#value' => t('Remove compounds'),
           '#limit_validation_errors' => [],
-          '#submit' => [
-            'user_defined_compounds_add_more_remove_one'
-            ],
-          '#ajax' => [
-            'callback' => 'user_defined_compounds_add_more_remove_one',
-            'wrapper' => 'user-defined-compounds-fieldset-wrapper',
-          ],
+      '#submit' => [[$this, 'userDefinedCompoundsRemoveOne']],
+        '#ajax' => [
+          'callback' => [$this, 'userDefinedCompoundsAjaxCallback'],
+          'wrapper' => 'user-defined-compounds-fieldset-wrapper',
+        ],
         ];
       } //$form_state['num_user_defined_compounds'] > 1
       $existing_uploaded_udc_file = $this->default_value_for_uploaded_files("UDC", $proposal_data->id);
@@ -351,12 +347,10 @@ class DwsimFlowsheetUploadAbstractCodeForm extends FormBase {
         '#title' => t('Upload an user defiend compound.'),
         '#description' => t('<span style="color:red;">Current File :</span> ' . $udcfilename . '<br />Separate filenames with underscore. No spaces or any special characters allowed in filename.') . '<br />' . t('<span style="color:red;">Allowed file extensions : ') . \Drupal::config('dwsim_flowsheet.settings')->get('dwsim_flowsheet_user_defind_compound_source_extensions') . '</span>',
       ];
-      if ($no_js_use) {
-        if (!empty($form['user_defined_compound_fieldset']['remove_user_defined_compounds']['#ajax'])) {
+      if (!empty($form['user_defined_compound_fieldset']['remove_user_defined_compounds']['#ajax'])) {
           unset($form['user_defined_compound_fieldset']['remove_user_defined_compounds']['#ajax']);
-        } //!empty($form['user_defined_compound_fieldset']['remove_user_defined_compounds']['#ajax'])
+        }
         unset($form['user_defined_compound_fieldset']['add_user_defined_compounds']['#ajax']);
-      } //$no_js_use
     }
     //////////////////////////////////////////////////////
     $existing_uploaded_A_file = $this->default_value_for_uploaded_files("A", $proposal_data->id);
@@ -399,42 +393,39 @@ class DwsimFlowsheetUploadAbstractCodeForm extends FormBase {
 
   public function validateForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
     if ($form_state->getValue(['unit_operations_used_in_dwsim'])) {
-      $unit_operations_used_in_dwsim = implode(", ", $_POST['unit_operations_used_in_dwsim']);
+      $unit_ops = $form_state->getValue(['unit_operations_used_in_dwsim']);
+      $unit_operations_used_in_dwsim = is_array($unit_ops) ? implode(", ", $unit_ops) : $unit_ops;
       $form_state->setValue(['unit_operations_used_in_dwsim'], $unit_operations_used_in_dwsim);
-    } //$form_state['values']['unit_operations_used_in_dwsim']
+    }
     else {
       $form_state->setErrorByName('unit_operations_used_in_dwsim', t('Please select.'));
     }
     if ($form_state->getValue(['thermodynamic_packages_used'])) {
-      $thermodynamic_packages_used = implode(", ", $_POST['thermodynamic_packages_used']);
+      $thermo = $form_state->getValue(['thermodynamic_packages_used']);
+      $thermodynamic_packages_used = is_array($thermo) ? implode(", ", $thermo) : $thermo;
       $form_state->setValue(['thermodynamic_packages_used'], $thermodynamic_packages_used);
-    } //$form_state['values']['thermodynamic_packages_used']
+    }
     else {
       $form_state->setErrorByName('thermodynamic_packages_used', t('Please select.'));
     }
     if ($form_state->getValue(['logical_blocks_used']) != "") {
-      $logical_blocks_used_in = $_POST['logical_blocks_used'];
-      if ($logical_blocks_used_in != "") {
-        if ($logical_blocks_used_in) {
-          $logical_blocks_used = implode(", ", $logical_blocks_used_in);
-          $form_state->setValue(['logical_blocks_used'], $logical_blocks_used);
-        } //$form_state['values']['logical_blocks_used']
-      } //$logical_blocks_used_in != ""
+      $logical_blocks = $form_state->getValue(['logical_blocks_used']);
+      if ($logical_blocks) {
+        $logical_blocks_used = is_array($logical_blocks) ? implode(", ", $logical_blocks) : $logical_blocks;
+        $form_state->setValue(['logical_blocks_used'], $logical_blocks_used);
+      }
       else {
         $form_state->setValue(['logical_blocks_used'], "Not entered");
       }
-    } //$form_state['values']['logical_blocks_used']
+    }
     else {
       $form_state->setValue(['logical_blocks_used'], "Not entered");
     }
-    if ($form_state->getValue([
-      'list_of_compounds_from_dwsim_database_used_in_process_flowsheet'
-      ])) {
-      $list_of_compounds_from_dwsim_database_used_in_process_flowsheet = implode("| ", $_POST['list_of_compounds_from_dwsim_database_used_in_process_flowsheet']);
-      $form_state->setValue([
-        'list_of_compounds_from_dwsim_database_used_in_process_flowsheet'
-        ], $list_of_compounds_from_dwsim_database_used_in_process_flowsheet);
-    } //$form_state['values']['list_of_compounds_from_dwsim_database_used_in_process_flowsheet']
+    if ($form_state->getValue(['list_of_compounds_from_dwsim_database_used_in_process_flowsheet'])) {
+      $compounds = $form_state->getValue(['list_of_compounds_from_dwsim_database_used_in_process_flowsheet']);
+      $compound_str = is_array($compounds) ? implode("| ", $compounds) : $compounds;
+      $form_state->setValue(['list_of_compounds_from_dwsim_database_used_in_process_flowsheet'], $compound_str);
+    }
     if (isset($_FILES['files'])) {
       /* check if file is uploaded */
       $existing_uploaded_A_file = $this->default_value_for_uploaded_files("A", $form_state->getValue([
@@ -959,4 +950,31 @@ function default_value_for_uploaded_files($filetype, $proposal_id) {
   return $selected_files_array;
 }
 
-?>
+  /**
+   * AJAX callback: returns the user-defined compounds wrapper.
+   */
+  public function userDefinedCompoundsAjaxCallback(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
+    return $form['user_defined_compound_fieldset'];
+  }
+
+  /**
+   * Submit handler: adds one more user-defined compound row.
+   */
+  public function userDefinedCompoundsAddOne(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
+    $count = $form_state->get(['num_user_defined_compounds']) ?? 1;
+    $form_state->set(['num_user_defined_compounds'], $count + 1);
+    $form_state->setRebuild();
+  }
+
+  /**
+   * Submit handler: removes the last user-defined compound row.
+   */
+  public function userDefinedCompoundsRemoveOne(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
+    $count = $form_state->get(['num_user_defined_compounds']) ?? 1;
+    if ($count > 1) {
+      $form_state->set(['num_user_defined_compounds'], $count - 1);
+    }
+    $form_state->setRebuild();
+  }
+
+}

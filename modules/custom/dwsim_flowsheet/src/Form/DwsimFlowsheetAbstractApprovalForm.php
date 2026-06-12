@@ -33,7 +33,8 @@ class DwsimFlowsheetAbstractApprovalForm extends FormBase {
     $solution_data = $solution_q->fetchObject();
     if (!$solution_data) {
       \Drupal::messenger()->addStatus(t('Invalid solution selected.'));
-      drupal_goto('lab-migration/code-approval');
+      $form_state->setRedirectUrl(\Drupal\Core\Url::fromUri('internal:/lab-migration/code-approval'));
+      return $form;
     }
     if ($solution_data->approval_status == 1) {
       \Drupal::messenger()->addError(t('This solution has already been approved. Are you sure you want to change the approval status?'));
@@ -219,7 +220,7 @@ class DwsimFlowsheetAbstractApprovalForm extends FormBase {
 
   public function submitForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
     $user = \Drupal::currentUser();
-    $solution_id = (int) arg(3);
+    $solution_id = (int) \Drupal::routeMatch()->getParameter('solution_id');
     /* get solution details */
     //$solution_q = db_query("SELECT * FROM {lab_migration_solution} WHERE id = %d", $solution_id);
     $query = \Drupal::database()->select('lab_migration_solution');
@@ -229,7 +230,8 @@ class DwsimFlowsheetAbstractApprovalForm extends FormBase {
     $solution_data = $solution_q->fetchObject();
     if (!$solution_data) {
       \Drupal::messenger()->addStatus(t('Invalid solution selected.'));
-      drupal_goto('lab_migration/code_approval');
+      $form_state->setRedirectUrl(\Drupal\Core\Url::fromUri('internal:/lab_migration/code_approval'));
+      return;
     }
     /* get experiment data */
     //$experiment_q = db_query("SELECT * FROM {lab_migration_experiment} WHERE id = %d", $solution_data->experiment_id);
@@ -384,7 +386,7 @@ class DwsimFlowsheetAbstractApprovalForm extends FormBase {
       }
     }
     \Drupal::messenger()->addStatus('Updated successfully.');
-    drupal_goto('lab-migration/code-approval');
+    $form_state->setRedirectUrl(\Drupal\Core\Url::fromUri('internal:/lab-migration/code-approval'));
   }
 
 }

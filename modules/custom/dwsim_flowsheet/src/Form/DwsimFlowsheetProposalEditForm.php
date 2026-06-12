@@ -310,13 +310,13 @@ class DwsimFlowsheetProposalEditForm extends FormBase {
       } //$proposal_data = $proposal_q->fetchObject()
       else {
         \Drupal::messenger()->addError(t('Invalid proposal selected. Please try again.'));
-        drupal_goto('flowsheeting-project/manage-proposal');
+        $form_state->setRedirect('dwsim_flowsheet.proposal_pending_0');
         return;
       }
     } //$proposal_q
     else {
       \Drupal::messenger()->addError(t('Invalid proposal selected. Please try again.'));
-      drupal_goto('flowsheeting-project/manage-proposal');
+      $form_state->setRedirect('dwsim_flowsheet.proposal_pending_0');
       return;
     }
     /* delete proposal */
