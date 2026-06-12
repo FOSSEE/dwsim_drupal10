@@ -1,3 +1,12 @@
 services:
   dwsim_flowsheet_global:
     class: '\Drupal\dwsim_flowsheet\Services\DwsimFlowsheetGlobalFunction'
+    arguments: ['@database', '@messenger', '@current_user']
+
+  dwsim_flowsheet.mail_helper:
+    class: '\Drupal\dwsim_flowsheet\Services\MailService'
+    arguments: ['@plugin.manager.mail', '@logger.factory', '@config.factory', '@language_manager']
+
+  dwsim_flowsheet.ajax_helper:
+    class: '\Drupal\dwsim_flowsheet\Services\AjaxHelper'
+    arguments: ['@renderer']
