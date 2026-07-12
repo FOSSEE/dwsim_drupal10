@@ -793,13 +793,13 @@ function cm_RenameDir($proposal_id, $dir_name)
         } //is_dir($files_id_dir)
         else
         {
-            \Drupal::messenger()->addMessage('Directory not available for rename.');
+            \Drupal::messenger()->addStatus('Directory not available for rename.');
             return;
         }
     } //$result != NULL
     else
     {
-        \Drupal::messenger()->addMessage('Project directory name not present in databse');
+        \Drupal::messenger()->addError('Project directory name not present in database.');
         return;
     }
     //var_dump($files);die;
@@ -865,10 +865,10 @@ function cm_rrmdir_project($prop_id)
             } //$objects as $object
             reset($objects);
             rmdir($dir);
-            $msg = \Drupal::messenger()->addMessage("Directory deleted successfully");
+            $msg = \Drupal::messenger()->addStatus("Directory deleted successfully");
             return $msg;
         } //is_dir($dir)
-        $msg = \Drupal::messenger()->addMessage("Directory not present");
+        $msg = \Drupal::messenger()->addStatus("Directory not present");
         return $msg;
     } //$proposal_data->id == $prop_id
     else
@@ -909,8 +909,8 @@ function custom_model_get_proposal()
     $proposal_data = $proposal_q->fetchObject();
     if (!$proposal_data)
       {
-        \Drupal::messenger()->addMessage("You do not have any approved custom model proposal. Please check the ");
-        drupal_goto('');
+        \Drupal::messenger()->addError("You do not have any approved custom model proposal.");
+        return FALSE;
       }
     switch ($proposal_data->approval_status)
     {

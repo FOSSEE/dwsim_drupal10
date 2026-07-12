@@ -9,9 +9,44 @@ namespace Drupal\custom_model\Form;
 
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\Element;
+use Drupal\Core\Database\Connection;
+use Drupal\Core\Messenger\MessengerInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Extension\ModuleExtensionList;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 class GeneratePdf extends FormBase {
+
+  protected $connection;
+  protected $messenger;
+  protected $currentUser;
+  protected $routeMatch;
+  protected $moduleList;
+
+  public function __construct(
+    Connection $connection,
+    MessengerInterface $messenger,
+    AccountInterface $currentUser,
+    RouteMatchInterface $routeMatch,
+    ModuleExtensionList $moduleList
+  ) {
+    $this->connection  = $connection;
+    $this->messenger   = $messenger;
+    $this->currentUser = $currentUser;
+    $this->routeMatch  = $routeMatch;
+    $this->moduleList  = $moduleList;
+  }
+
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('database'),
+      $container->get('messenger'),
+      $container->get('current_user'),
+      $container->get('current_route_match'),
+      $container->get('extension.list.module')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -21,22 +56,21 @@ class GeneratePdf extends FormBase {
   }
 
   public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $mpath = drupal_get_path('module', 'custom_model');
-    //var_dump($mpath);die;
+    // GeneratePdf relies on FPDF and QRcode libraries included from the module path.
+    $mpath = $this->moduleList->getPath('custom_model');
     require($mpath . '/pdf/fpdf/fpdf.php');
     require($mpath . '/pdf/phpqrcode/qrlib.php');
-    $user = \Drupal::currentUser();
-    $x = $user->uid;
-    $proposal_id = arg(3);
-    $query3 = \Drupal::database()->query("SELECT * FROM custom_model_proposal WHERE approval_status=3 AND uid= :uid AND id=:proposal_id", [
-      ':uid' => $user->uid,
+    $uid  = $this->currentUser->id();
+    $proposal_id = (int) $this->routeMatch->getParameter('id');
+    $query3 = $this->connection->query("SELECT * FROM custom_model_proposal WHERE approval_status=3 AND uid= :uid AND id=:proposal_id", [
+      ':uid'         => $uid,
       ':proposal_id' => $proposal_id,
     ]);
     $data3 = $query3->fetchObject();
     if ($data3) {
-      if ($data3->uid != $x) {
-        \Drupal::messenger()->addMessage('Certificate is not available', 'error');
-        return;
+      if ($data3->uid != $uid) {
+        $this->messenger->addError($this->t('Certificate is not available'));
+        return [];
       }
     }
     $gender = [
@@ -65,7 +99,7 @@ class GeneratePdf extends FormBase {
     $image_bg = $mpath . "/pdf/images/bg_cert.png";
     $pdf->Image($image_bg, 0, 0, $pdf->GetPageWidth(), $pdf->GetPageHeight());
     $pdf->SetMargins(18, 1, 18);
-    $path = drupal_get_path('module', 'custom_model');
+    $path = $mpath;
     $pdf->Ln(15);
     $pdf->Ln(20);
     $pdf->SetFont('Arial', 'BI', 25);
@@ -109,11 +143,11 @@ class GeneratePdf extends FormBase {
     $proposal_get_id = 0;
     $UniqueString = "";
     $tempDir = $path . "/pdf/temp_prcode/";
-    $query = \Drupal::database()->select('custom_model_qr_code');
+    $query = $this->connection->select('custom_model_qr_code');
     $query->fields('custom_model_qr_code');
     $query->condition('proposal_id', $proposal_id);
     $result = $query->execute();
-    $data = $result->fetchObject();
+    $data   = $result->fetchObject();
     $DBString = $data->qr_code;
     $proposal_get_id = $data->proposal_id;
     if ($DBString == "" || $DBString == "null") {
@@ -128,7 +162,7 @@ class GeneratePdf extends FormBase {
         ":proposal_id" => $proposal_id,
         ":qr_code" => $UniqueString,
       ];
-      $result = \Drupal::database()->query($query, $args, ['return' => Database::RETURN_INSERT_ID]);
+      $result = $this->connection->query($query, $args);
     } //$DBString == "" || $DBString == "null"
     else {
       $UniqueString = $DBString;

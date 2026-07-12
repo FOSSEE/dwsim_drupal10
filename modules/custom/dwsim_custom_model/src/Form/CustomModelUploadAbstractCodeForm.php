@@ -13,10 +13,49 @@ use Drupal\Core\Render\Element;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Drupal\Core\Url;
 use Drupal\Core\Link;
+use Drupal\Core\Database\Connection;
+use Drupal\Core\Messenger\MessengerInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Database\Database;
+use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\custom_model\Services\CustomModelGlobalfunction;
 
 class CustomModelUploadAbstractCodeForm extends FormBase {
+
+  protected $connection;
+  protected $messenger;
+  protected $currentUser;
+  protected $routeMatch;
+  protected $globalFunction;
+  protected $configFactory;
+
+  public function __construct(
+    Connection $connection,
+    MessengerInterface $messenger,
+    AccountInterface $currentUser,
+    RouteMatchInterface $routeMatch,
+    CustomModelGlobalfunction $globalFunction,
+    ConfigFactoryInterface $configFactory
+  ) {
+    $this->connection     = $connection;
+    $this->messenger      = $messenger;
+    $this->currentUser    = $currentUser;
+    $this->routeMatch     = $routeMatch;
+    $this->globalFunction = $globalFunction;
+    $this->configFactory  = $configFactory;
+  }
+
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('database'),
+      $container->get('messenger'),
+      $container->get('current_user'),
+      $container->get('current_route_match'),
+      $container->get('custom_model_global'),
+      $container->get('config.factory')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -26,17 +65,13 @@ class CustomModelUploadAbstractCodeForm extends FormBase {
   }
 
   public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
+    $user = $this->currentUser;
     $form['#attributes'] = ['enctype' => "multipart/form-data"];
-    /* get current proposal */
-    //$proposal_id = (int) arg(3);
-    $route_match = \Drupal::routeMatch();
-    $proposal_id = (int) $route_match->getParameter('id');
-    $proposal_data = custom_model_get_proposal($proposal_id);
-if (!$proposal_data) {
-  \Drupal::messenger()->addMessage(t('Invalid proposal selected. Please try again.'), 'error');
-  return new RedirectResponse('/custom-model/abstract-code/upload');
-}
+    $proposal_data = $this->globalFunction->custom_model_get_proposal();
+    if (!$proposal_data) {
+      $this->messenger->addError($this->t('Invalid proposal selected. Please try again.'));
+      return new RedirectResponse('/custom-model/abstract-code/upload');
+    }
 
     // $uid = $user->uid;
     // $query = \Drupal::database()->select('custom_model_proposal');
@@ -63,18 +98,15 @@ if (!$proposal_data) {
     // return new RedirectResponse('/custom-model/abstract-code/upload');
     //   return;
     // }
-    $query = \Drupal::database()->select('custom_model_submitted_abstracts');
-    $query->fields('custom_model_submitted_abstracts');
-    $query->condition('proposal_id', $proposal_data->id);
-    $abstracts_q = $query->execute()->fetchObject();
-    if ($abstracts_q) {
-      if ($abstracts_q->is_submitted == 1) {
-        \Drupal::messenger()->addMessage(t('You have already submited your project files, hence you can not upload more code, for any query please write to us.'), 'error', $repeat = FALSE);
-        // drupal_goto('custom-model/abstract-code');
-        return new RedirectResponse('/custom-model/abstract-code/upload');
-        return;
-      } //$abstracts_q->is_submitted == 1
-    } //$abstracts_q->is_submitted == 1
+    $abstracts_q = $this->connection->select('custom_model_submitted_abstracts')
+      ->fields('custom_model_submitted_abstracts')
+      ->condition('proposal_id', $proposal_data->id)
+      ->execute()
+      ->fetchObject();
+    if ($abstracts_q && $abstracts_q->is_submitted == 1) {
+      $this->messenger->addError($this->t('You have already submitted your project files. For any query please write to us.'));
+      return new RedirectResponse('/custom-model/abstract-code/upload');
+    }
     $form['project_title'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->project_title,
@@ -91,36 +123,35 @@ if (!$proposal_data) {
       '#title' => t('DWSIM version used'),
     ];
     // var_dump($proposal_data);die;
-    $existing_uploaded_S_file = \Drupal::service("custom_model_global")->default_value_for_uploaded_files("S", $proposal_data->id);
+    $existing_uploaded_S_file = $this->globalFunction->default_value_for_uploaded_files('S', $proposal_data->id);
     if (!$existing_uploaded_S_file) {
       $existing_uploaded_S_file = new \stdClass();
-      $existing_uploaded_S_file->filename = "No file uploaded";
-    } //!$existing_uploaded_S_file
+      $existing_uploaded_S_file->filename = 'No file uploaded';
+    }
     $form['upload_custom_model_simulation_file'] = [
       '#type' => 'file',
-      '#title' => t('Upload the Custom Model as DWSIM Simulation File'),
-      '#description' => t('<span style="color:red;">Current File :</span> ' . $existing_uploaded_S_file->filename . '<br />Separate filenames with underscore. No spaces or any special characters allowed in filename.') . '<br />' . t('<span style="color:red;">Allowed file extensions : ') .  \Drupal::config('custom_model.settings')->get('custom_model_simulation_file', '') . '</span>',
-    ];// Upload simulation file
-    $existing_uploaded_P_file = \Drupal::service("custom_model_global")->default_value_for_uploaded_files("P", $proposal_data->id);
+      '#title' => $this->t('Upload the Custom Model as DWSIM Simulation File'),
+      '#description' => $this->t('<span style="color:red;">Current File :</span> ' . $existing_uploaded_S_file->filename . '<br />Separate filenames with underscore. No spaces or any special characters allowed in filename.') . '<br />' . $this->t('<span style="color:red;">Allowed file extensions : ') . $this->configFactory->get('custom_model.settings')->get('custom_model_simulation_file', '') . '</span>',
+    ];
+    $existing_uploaded_P_file = $this->globalFunction->default_value_for_uploaded_files('P', $proposal_data->id);
     if (!$existing_uploaded_P_file) {
       $existing_uploaded_P_file = new \stdClass();
-      $existing_uploaded_P_file->filename = "No file uploaded";
-    } //!$existing_uploaded_P_file
+      $existing_uploaded_P_file->filename = 'No file uploaded';
+    }
     $form['upload_custom_model_script_file'] = [
       '#type' => 'file',
-      '#title' => t('Upload the scilab/ironpython script for the custom model'),
-      '#description' => t('<span style="color:red;">Current File :</span> '. $existing_uploaded_P_file->filename . '<br />Separate filenames with underscore. No spaces or any special characters allowed in filename.') . '<br />' . t('<span style="color:red;">Allowed file extensions : ') .  \Drupal::config('custom_model.settings')->get('custom_model_script_file', '') . '</span>',
+      '#title' => $this->t('Upload the scilab/ironpython script for the custom model'),
+      '#description' => $this->t('<span style="color:red;">Current File :</span> ' . $existing_uploaded_P_file->filename . '<br />Separate filenames with underscore. No spaces or any special characters allowed in filename.') . '<br />' . $this->t('<span style="color:red;">Allowed file extensions : ') . $this->configFactory->get('custom_model.settings')->get('custom_model_script_file', '') . '</span>',
     ];
-    $existing_uploaded_A_file = \Drupal::service("custom_model_global")
-    ->default_value_for_uploaded_files("A", $proposal_data->id);
+    $existing_uploaded_A_file = $this->globalFunction->default_value_for_uploaded_files('A', $proposal_data->id);
     if (!$existing_uploaded_A_file) {
       $existing_uploaded_A_file = new \stdClass();
-      $existing_uploaded_A_file->filename = "No file uploaded";
-    } //!$existing_uploaded_A_file
+      $existing_uploaded_A_file->filename = 'No file uploaded';
+    }
     $form['upload_an_abstract'] = [
       '#type' => 'file',
-      '#title' => t('Upload an abstract of the project.'),
-      '#description' => t('<span style="color:red;">Current File :</span> ' . $existing_uploaded_A_file->filename . '<br />Separate filenames with underscore. No spaces or any special characters allowed in filename.<br />' . t('<span style="color:red;">Allowed file extensions : ') .  \Drupal::config('custom_model.settings')->get('custom_model_abstract_upload_extensions', '') . '</span>'),
+      '#title' => $this->t('Upload an abstract of the project.'),
+      '#description' => $this->t('<span style="color:red;">Current File :</span> ' . $existing_uploaded_A_file->filename . '<br />Separate filenames with underscore. No spaces or any special characters allowed in filename.<br />' . $this->t('<span style="color:red;">Allowed file extensions : ') . $this->configFactory->get('custom_model.settings')->get('custom_model_abstract_upload_extensions', '') . '</span>'),
     ];
 
     $form['prop_id'] = [
@@ -129,19 +160,14 @@ if (!$proposal_data) {
     ];
     $form['submit'] = [
       '#type' => 'submit',
-      '#value' => t('Submit'),
-      // '#value' => $this->t('Submit'),
-      '#submit' => [
-        // 'custom_model_upload_abstract_code_form_submit'
-        'custom_model.upload_abstract_code_form'
-        ],
+      '#value' => $this->t('Submit'),
     ];
     $form['cancel'] = [
       '#type' => 'item',
-      // '#markup' => l(t('Cancel'), 'custom-model/abstract-code'),
-      '#markup' => \Drupal\Core\Link::fromTextAndUrl(
-  t('Cancel'),\Drupal\Core\Url::fromUserInput('/custom-model/abstract-code/circuit simulation-project-list')
-)->toString(),
+      '#markup' => Link::fromTextAndUrl(
+        $this->t('Cancel'),
+        Url::fromUserInput('/custom-model/abstract-code/circuit simulation-project-list')
+      )->toString(),
     ];
     return $form;
   }
@@ -149,15 +175,9 @@ if (!$proposal_data) {
   public function validateForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
     if (isset($_FILES['files'])) {
       /* check if file is uploaded */
-      $existing_uploaded_A_file = \Drupal::service("custom_model_global")->default_value_for_uploaded_files("A", $form_state->getValue([
-        'prop_id'
-        ]));
-      $existing_uploaded_S_file = \Drupal::service("custom_model_global")->default_value_for_uploaded_files("S", $form_state->getValue([
-        'prop_id'
-        ]));
-      $existing_uploaded_P_file = \Drupal::service("custom_model_global")->default_value_for_uploaded_files("P", $form_state->getValue([
-        'prop_id'
-        ]));
+      $existing_uploaded_A_file = $this->globalFunction->default_value_for_uploaded_files('A', $form_state->getValue(['prop_id']));
+      $existing_uploaded_S_file = $this->globalFunction->default_value_for_uploaded_files('S', $form_state->getValue(['prop_id']));
+      $existing_uploaded_P_file = $this->globalFunction->default_value_for_uploaded_files('P', $form_state->getValue(['prop_id']));
       if (!$existing_uploaded_S_file) {
         if (!($_FILES['files']['name']['upload_custom_model_simulation_file'])) {
           $form_state->setErrorByName('upload_custom_model_simulation_file', t('Please upload the file.'));
@@ -229,15 +249,13 @@ if (!$proposal_data) {
   }
 
   public function submitForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
+    $user = $this->currentUser;
     $v = $form_state->getValues();
-    $root_path = \Drupal::service("custom_model_global")->custom_model_path();
-    $proposal_data = custom_model_get_proposal();
-    $proposal_id = $proposal_data->id;
+    $root_path = $this->globalFunction->custom_model_path();
+    $proposal_data = $this->globalFunction->custom_model_get_proposal();
     if (!$proposal_data) {
-      // drupal_goto('');
       return;
-    } //!$proposal_data
+    }
     $proposal_id = $proposal_data->id;
     $proposal_directory = $proposal_data->directory_name;
     /* create proposal folder if not present */
@@ -249,34 +267,11 @@ if (!$proposal_data) {
     $proposal_id = $proposal_data->id;
     $query_s = "SELECT * FROM {custom_model_submitted_abstracts} WHERE proposal_id = :proposal_id";
     $args_s = [":proposal_id" => $proposal_id];
-    $query_s_result = \Drupal::database()->query($query_s, $args_s)->fetchObject();
+    $query_s_result = $this->connection->query($query_s, $args_s)->fetchObject();
     if (!$query_s_result) {
-      /* creating solution database entry */
-      $query = "INSERT INTO {custom_model_submitted_abstracts} (
-	proposal_id,
-	approver_uid,
-	abstract_approval_status,
-	abstract_upload_date,
-	abstract_approval_date,
-	is_submitted) VALUES (:proposal_id, :approver_uid, :abstract_approval_status,:abstract_upload_date, :abstract_approval_date, :is_submitted)";
-      $args = [
-        ":proposal_id" => $proposal_id,
-        ":approver_uid" => 0,
-        ":abstract_approval_status" => 0,
-        ":abstract_upload_date" => time(),
-        ":abstract_approval_date" => 0,
-        ":is_submitted" => 1,
-      ];
-      $submitted_abstract_id = \Drupal::database()->query($query, $args, [
-        'return' => Database::RETURN_INSERT_ID
-        ]);
-      $query1 = "UPDATE {custom_model_proposal} SET is_submitted = :is_submitted WHERE id = :id";
-      $args1 = [
-        ":is_submitted" => 1,
-        ":id" => $proposal_id,
-      ];
-      \Drupal::database()->query($query1, $args1);
-      \Drupal::messenger()->addMessage('Abstract uploaded successfully.', 'status');
+      $submitted_abstract_id = $this->connection->query($query, $args);
+      $this->connection->query($query1, $args1);
+      $this->messenger->addStatus($this->t('Abstract uploaded successfully.'));
     } //!$query_s_result
     else {
       $query = "UPDATE {custom_model_submitted_abstracts} SET 
@@ -291,16 +286,9 @@ if (!$proposal_data) {
         ":is_submitted" => 1,
         ":proposal_id" => $proposal_id,
       ];
-      $submitted_abstract_id = \Drupal::database()->query($query, $args, [
-        'return' => Database::RETURN_INSERT_ID
-        ]);
-      $query1 = "UPDATE {custom_model_proposal} SET is_submitted = :is_submitted WHERE id = :id";
-      $args1 = [
-        ":is_submitted" => 1,
-        ":id" => $proposal_id,
-      ];
-      \Drupal::database()->query($query1, $args1);
-      \Drupal::messenger()->addMessage('Abstract updated successfully.', 'status');
+      $submitted_abstract_id = $this->connection->query($query, $args);
+      $this->connection->query($query1, $args1);
+      $this->messenger->addStatus($this->t('Abstract updated successfully.'));
     }
     foreach ($_FILES['files']['name'] as $file_form_name => $file_name) {
       if ($file_name) {
@@ -325,9 +313,9 @@ if (!$proposal_data) {
           case 'S':
             if (file_exists($root_path . $dest_path_project_files . $_FILES['files']['name'][$file_form_name])) {
               //unlink($root_path . $dest_path . $_FILES['files']['name'][$file_form_name]);
-              \Drupal::messenger()->addMessage(t("File !filename already exists hence overwirtten the exisitng file ", [
-                '!filename' => $_FILES['files']['name'][$file_form_name]
-                ]), 'error');
+              $this->messenger->addError($this->t('File @filename already exists and has been overwritten.', [
+                '@filename' => $_FILES['files']['name'][$file_form_name],
+              ]));
             } //file_exists($root_path . $dest_path . $_FILES['files']['name'][$file_form_name])
 					/* uploading file */
             else {
@@ -346,7 +334,7 @@ if (!$proposal_data) {
                   $args = [
                     ":submitted_abstract_id" => $submitted_abstract_id,
                     ":proposal_id" => $proposal_id,
-                    ":uid" => $user->uid,
+                    ":uid" => $this->currentUser->id(),
                     ":approvar_uid" => 0,
                     ":filename" => $_FILES['files']['name'][$file_form_name],
                     ":filepath" => $_FILES['files']['name'][$file_form_name],
@@ -355,8 +343,8 @@ if (!$proposal_data) {
                     ":filetype" => $file_type,
                     ":timestamp" => time(),
                   ];
-                  \Drupal::database()->query($query, $args);
-                  \Drupal::messenger()->addMessage($file_name . ' uploaded successfully.', 'status');
+                  $this->connection->query($query, $args);
+                  $this->messenger->addStatus($file_name . ' uploaded successfully.');
                 } //!$query_ab_f_result
                 else {
                   unlink($root_path . $dest_path_project_files . $query_ab_f_result->filename);
@@ -370,12 +358,12 @@ if (!$proposal_data) {
                     ":proposal_id" => $proposal_id,
                     ":filetype" => $file_type,
                   ];
-                  \Drupal::database()->query($query, $args);
-                  \Drupal::messenger()->addMessage($file_name . ' file updated successfully.', 'status');
+                  $this->connection->query($query, $args);
+                  $this->messenger->addStatus($file_name . ' file updated successfully.');
                 }
               } //move_uploaded_file($_FILES['files']['tmp_name'][$file_form_name], $root_path . $dest_path . $_FILES['files']['name'][$file_form_name])
               else {
-                \Drupal::messenger()->addMessage('Error uploading file : ' . $dest_path_project_files . $file_name, 'error');
+                $this->messenger->addError($this->t('Error uploading file: @path', ['@path' => $dest_path_project_files . $file_name]));
               }
             }
             break;
@@ -403,7 +391,7 @@ if (!$proposal_data) {
                   $args = [
                     ":submitted_abstract_id" => $submitted_abstract_id,
                     ":proposal_id" => $proposal_id,
-                    ":uid" => $user->uid,
+                ":uid" => $this->currentUser->id(),
                     ":approvar_uid" => 0,
                     ":filename" => $_FILES['files']['name'][$file_form_name],
                     ":filepath" => $_FILES['files']['name'][$file_form_name],
@@ -412,8 +400,8 @@ if (!$proposal_data) {
                     ":filetype" => $file_type,
                     ":timestamp" => time(),
                   ];
-                  \Drupal::database()->query($query, $args);
-                  \Drupal::messenger()->addMessage($file_name . ' uploaded successfully.', 'status');
+                  $this->connection->query($query, $args);
+                  $this->messenger->addStatus($file_name . ' uploaded successfully.');
                 } //!$query_ab_f_result
                 else {
                   unlink($root_path . $dest_path_project_files . $query_ab_f_result->filename);
@@ -427,12 +415,12 @@ if (!$proposal_data) {
                     ":proposal_id" => $proposal_id,
                     ":filetype" => $file_type,
                   ];
-                  \Drupal::database()->query($query, $args);
-                  \Drupal::messenger()->addMessage($file_name . ' file updated successfully.', 'status');
+                  $this->connection->query($query, $args);
+                  $this->messenger->addStatus($file_name . ' file updated successfully.');
                 }
               } //move_uploaded_file($_FILES['files']['tmp_name'][$file_form_name], $root_path . $dest_path . $_FILES['files']['name'][$file_form_name])
               else {
-                \Drupal::messenger()->addMessage('Error uploading file : ' . $dest_path_project_files . $file_name, 'error');
+                $this->messenger->addError($this->t('Error uploading file: @path', ['@path' => $dest_path_project_files . $file_name]));
               }
             }
             break;
@@ -460,7 +448,7 @@ if (!$proposal_data) {
                   $args = [
                     ":submitted_abstract_id" => $submitted_abstract_id,
                     ":proposal_id" => $proposal_id,
-                    ":uid" => $user->uid,
+                ":uid" => $this->currentUser->id(),
                     ":approvar_uid" => 0,
                     ":filename" => $_FILES['files']['name'][$file_form_name],
                     ":filepath" => $_FILES['files']['name'][$file_form_name],
@@ -469,8 +457,8 @@ if (!$proposal_data) {
                     ":filetype" => $file_type,
                     ":timestamp" => time(),
                   ];
-                  \Drupal::database()->query($query, $args);
-                  \Drupal::messenger()->addMessage($file_name . ' uploaded successfully.', 'status');
+                  $this->connection->query($query, $args);
+                  $this->messenger->addStatus($file_name . ' uploaded successfully.');
                 } //!$query_ab_f_result
                 else {
                   unlink($root_path . $dest_path_project_files . $query_ab_f_result->filename);
@@ -484,12 +472,12 @@ if (!$proposal_data) {
                     ":proposal_id" => $proposal_id,
                     ":filetype" => $file_type,
                   ];
-                  \Drupal::database()->query($query, $args);
-                  \Drupal::messenger()->addMessage($file_name . ' file updated successfully.', 'status');
+                  $this->connection->query($query, $args);
+                  $this->messenger->addStatus($file_name . ' file updated successfully.');
                 }
               } //move_uploaded_file($_FILES['files']['tmp_name'][$file_form_name], $root_path . $dest_path . $_FILES['files']['name'][$file_form_name])
               else {
-                \Drupal::messenger()->addMessage('Error uploading file : ' . $dest_path_project_files . $file_name, 'error');
+                $this->messenger->addError($this->t('Error uploading file: @path', ['@path' => $dest_path_project_files . $file_name]));
               }
             }
             break;
