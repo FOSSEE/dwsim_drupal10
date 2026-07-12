@@ -9,9 +9,59 @@ namespace Drupal\lab_migration\Form;
 
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\Element;
+use Drupal\Core\Database\Connection;
+use Drupal\Core\Messenger\MessengerInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\Core\Url;
+use Drupal\Core\Link;
 
 class LabMigrationLabNotesForm extends FormBase {
+
+  /**
+   * The database connection.
+   *
+   * @var \Drupal\Core\Database\Connection
+   */
+  protected $database;
+
+  /**
+   * The messenger service.
+   *
+   * @var \Drupal\Core\Messenger\MessengerInterface
+   */
+  protected $messenger;
+
+  /**
+   * The request stack.
+   *
+   * @var \Symfony\Component\HttpFoundation\RequestStack
+   */
+  protected $requestStack;
+
+  /**
+   * Constructs a new LabMigrationLabNotesForm object.
+   */
+  public function __construct(
+    Connection $database,
+    MessengerInterface $messenger,
+    RequestStack $request_stack
+  ) {
+    $this->database = $database;
+    $this->messenger = $messenger;
+    $this->requestStack = $request_stack;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('database'),
+      $container->get('messenger'),
+      $container->get('request_stack')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -20,99 +70,128 @@ class LabMigrationLabNotesForm extends FormBase {
     return 'lab_migration_lab_notes_form';
   }
 
-  public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
-    /* get current proposal */
-    $proposal_id = (int) arg(3);
-    //$proposal_q = \Drupal::database()->query("SELECT * FROM {lab_migration_proposal} WHERE id = %d LIMIT 1", $proposal_id);
-    $query = \Drupal::database()->select('lab_migration_proposal');
-    $query->fields('lab_migration_proposal');
-    $query->condition('id', $proposal_id);
-    $query->range(0, 1);
-    $proposal_q = $query->execute();
-    $proposal_data = $proposal_q->fetchObject();
-    if (!$proposal_data) {
-      \Drupal::messenger()->addmesssage(t('Invalid lab selected. Please try again.'), 'error');
-      drupal_goto('lab-migration/code-approval');
-      return;
+  /**
+   * {@inheritdoc}
+   */
+  public function buildForm(array $form, FormStateInterface $form_state) {
+    $route_match = $this->requestStack->getCurrentRequest()->attributes->get('_route_match');
+    $proposal_id = 0;
+    if ($route_match) {
+      $proposal_id = (int) $route_match->getParameter('proposal_id');
+      if (!$proposal_id) {
+        $proposal_id = (int) $route_match->getParameter('id');
+      }
     }
+
+    $proposal_data = $this->database->select('lab_migration_proposal')
+      ->fields('lab_migration_proposal')
+      ->condition('id', $proposal_id)
+      ->range(0, 1)
+      ->execute()
+      ->fetchObject();
+
+    if (!$proposal_data) {
+      $this->messenger->addError($this->t('Invalid lab selected. Please try again.'));
+      // In buildForm we cannot use $form_state->setRedirect. We return the empty form or let it return.
+      return $form;
+    }
+
     /* get current notes */
     $notes = '';
-    //$notes_q = \Drupal::database()->query("SELECT * FROM {lab_migration_notes} WHERE proposal_id = %d LIMIT 1", $proposal_id);
-    $query = \Drupal::database()->select('lab_migration_notes');
-    $query->fields('lab_migration_notes');
-    $query->condition('proposal_id', $proposal_id);
-    $query->range(0, 1);
-    $notes_q = $query->execute();
-    if ($notes_q) {
-      $notes_data = $notes_q->fetchObject();
+    $notes_data = $this->database->select('lab_migration_notes')
+      ->fields('lab_migration_notes')
+      ->condition('proposal_id', $proposal_id)
+      ->range(0, 1)
+      ->execute()
+      ->fetchObject();
+
+    if ($notes_data) {
       $notes = $notes_data->notes;
     }
+
     $form['lab_details'] = [
       '#type' => 'item',
-      '#value' => '<span style="color: rgb(128, 0, 0);"><strong>About the Lab</strong></span><br />' . '<strong>Proposer:</strong> ' . $proposal_data->name . '<br />' . '<strong>Title of the Lab:</strong> ' . $proposal_data->lab_title . '<br />',
+      '#markup' => '<span style="color: rgb(128, 0, 0);"><strong>About the Lab</strong></span><br />' . '<strong>Proposer:</strong> ' . htmlspecialchars($proposal_data->name) . '<br />' . '<strong>Title of the Lab:</strong> ' . htmlspecialchars($proposal_data->lab_title) . '<br />',
     ];
+
     $form['notes'] = [
       '#type' => 'textarea',
       '#rows' => 20,
-      '#title' => t('Notes for Reviewers'),
+      '#title' => $this->t('Notes for Reviewers'),
       '#default_value' => $notes,
     ];
+
     $form['submit'] = [
       '#type' => 'submit',
-      '#value' => t('Submit'),
+      '#value' => $this->t('Submit'),
     ];
+
     $form['cancel'] = [
       '#type' => 'markup',
-      '#value' => l(t('Back'), 'lab-migration/code-approval'),
+      '#markup' => Link::fromTextAndUrl(
+        $this->t('Back'),
+        Url::fromRoute('lab_migration.code_approval')
+      )->toString(),
     ];
+
     return $form;
   }
 
-  public function submitForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
-    /* get current proposal */
-    $proposal_id = (int) arg(3);
-    //$proposal_q = \Drupal::database()->query("SELECT * FROM {lab_migration_proposal} WHERE id = %d LIMIT 1", $proposal_id);
-    $query = \Drupal::database()->select('lab_migration_proposal');
-    $query->fields('lab_migration_proposal');
-    $query->condition('id', $proposal_id);
-    $query->range(0, 1);
-    $proposal_q = $query->execute();
-    $proposal_data = $proposal_q->fetchObject();
+  /**
+   * {@inheritdoc}
+   */
+  public function submitForm(array &$form, FormStateInterface $form_state) {
+    $route_match = $this->requestStack->getCurrentRequest()->attributes->get('_route_match');
+    $proposal_id = 0;
+    if ($route_match) {
+      $proposal_id = (int) $route_match->getParameter('proposal_id');
+      if (!$proposal_id) {
+        $proposal_id = (int) $route_match->getParameter('id');
+      }
+    }
+
+    $proposal_data = $this->database->select('lab_migration_proposal')
+      ->fields('lab_migration_proposal')
+      ->condition('id', $proposal_id)
+      ->range(0, 1)
+      ->execute()
+      ->fetchObject();
+
     if (!$proposal_data) {
-      \Drupal::messenger()->addmesssage(t('Invalid lab selected. Please try again.'), 'error');
-      drupal_goto('lab-migration/code-approval');
+      $this->messenger->addError($this->t('Invalid lab selected. Please try again.'));
+      $form_state->setRedirect('lab_migration.code_approval');
       return;
     }
-    /* find existing notes */
-    //$notes_q = \Drupal::database()->query("SELECT * FROM {lab_migration_notes} WHERE proposal_id = %d LIMIT 1", $proposal_id);
-    $query = \Drupal::database()->select('lab_migration_notes');
-    $query->fields('lab_migration_notes');
-    $query->condition('proposal_id', $proposal_id);
-    $query->range(0, 1);
-    $notes_q = $query->execute();
-    $notes_data = $notes_q->fetchObject();
-    /* add or update notes in database */
+
+    $notes_data = $this->database->select('lab_migration_notes')
+      ->fields('lab_migration_notes')
+      ->condition('proposal_id', $proposal_id)
+      ->range(0, 1)
+      ->execute()
+      ->fetchObject();
+
     if ($notes_data) {
-      $query = "UPDATE {lab_migration_notes} SET notes = :notes WHERE id = :notes_id";
-      $args = [
-        ":notes" => $form_state->getValue(['notes']),
-        ":notes_id" => $notes_data->id,
-      ];
-      \Drupal::database()->query($query, $args);
-      \Drupal::messenger()->addmesssage('Notes updated successfully.', 'status');
+      $this->database->update('lab_migration_notes')
+        ->fields([
+          'notes' => $form_state->getValue('notes'),
+        ])
+        ->condition('id', $notes_data->id)
+        ->execute();
+
+      $this->messenger->addMessage($this->t('Notes updated successfully.'));
     }
     else {
-      $query = "INSERT INTO {lab_migration_notes} (proposal_id, notes) VALUES (:proposal_id, :notes)";
-      $args = [
-        ":proposal_id" => $proposal_id,
-        ":notes" => $form_state->getValue(['notes']),
-      ];
-      \Drupal::database()->query($query, $args);
-      \Drupal::messenger()->addmesssage('Notes added successfully.', 'status');
+      $this->database->insert('lab_migration_notes')
+        ->fields([
+          'proposal_id' => $proposal_id,
+          'notes' => $form_state->getValue('notes'),
+        ])
+        ->execute();
+
+      $this->messenger->addMessage($this->t('Notes added successfully.'));
     }
+
+    $form_state->setRedirect('lab_migration.code_approval');
   }
 
 }
-?>

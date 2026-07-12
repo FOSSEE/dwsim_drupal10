@@ -9,19 +9,92 @@ namespace Drupal\lab_migration\Form;
 
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\Element;
-use Symfony\Component\HttpFoundation\RedirectResponse;
-use Drupal\Core\Routing\TrustedRedirectResponse;
-use Drupal\user\Entity\User;
-use Drupal\Component\Utility\Xss;
+use Drupal\Core\Database\Connection;
+use Drupal\Core\Messenger\MessengerInterface;
+use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Drupal\lab_migration\Services\MailService;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Url;
 use Drupal\Core\Link;
-use Drupal\Core\Mail\MailManager;
-use Drupal\Core\Mail\MailManagerInterface;
-
-
 
 class LabMigrationProposalStatusForm extends FormBase {
+
+  /**
+   * The database connection.
+   *
+   * @var \Drupal\Core\Database\Connection
+   */
+  protected $database;
+
+  /**
+   * The messenger service.
+   *
+   * @var \Drupal\Core\Messenger\MessengerInterface
+   */
+  protected $messenger;
+
+  /**
+   * The current user.
+   *
+   * @var \Drupal\Core\Session\AccountProxyInterface
+   */
+  protected $currentUser;
+
+  /**
+   * The entity type manager.
+   *
+   * @var \Drupal\Core\Entity\EntityTypeManagerInterface
+   */
+  protected $entityTypeManager;
+
+  /**
+   * The request stack.
+   *
+   * @var \Symfony\Component\HttpFoundation\RequestStack
+   */
+  protected $requestStack;
+
+  /**
+   * The mail service.
+   *
+   * @var \Drupal\lab_migration\Services\MailService
+   */
+  protected $mailService;
+
+  /**
+   * Constructs a new LabMigrationProposalStatusForm object.
+   */
+  public function __construct(
+    Connection $database,
+    MessengerInterface $messenger,
+    AccountProxyInterface $current_user,
+    EntityTypeManagerInterface $entity_type_manager,
+    RequestStack $request_stack,
+    MailService $mail_service
+  ) {
+    $this->database = $database;
+    $this->messenger = $messenger;
+    $this->currentUser = $current_user;
+    $this->entityTypeManager = $entity_type_manager;
+    $this->requestStack = $request_stack;
+    $this->mailService = $mail_service;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('database'),
+      $container->get('messenger'),
+      $container->get('current_user'),
+      $container->get('entity_type.manager'),
+      $container->get('request_stack'),
+      $container->get('lab_migration.mail_service')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -30,350 +103,296 @@ class LabMigrationProposalStatusForm extends FormBase {
     return 'lab_migration_proposal_status_form';
   }
 
-  public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
-    /* get current proposal */
-    // $proposal_id = (int) arg(3);
-    $route_match = \Drupal::routeMatch();
+  /**
+   * {@inheritdoc}
+   */
+  public function buildForm(array $form, FormStateInterface $form_state) {
+    $route_match = $this->requestStack->getCurrentRequest()->attributes->get('_route_match');
+    $proposal_id = $route_match ? (int) $route_match->getParameter('id') : 0;
 
-$proposal_id = (int) $route_match->getParameter('id');
-    //$proposal_q = $injected_database->query("SELECT * FROM {lab_migration_proposal} WHERE id = %d", $proposal_id);
-    $query = \Drupal::database()->select('lab_migration_proposal');
-    $query->fields('lab_migration_proposal');
-    $query->condition('id', $proposal_id);
-    $proposal_q = $query->execute();
-    if ($proposal_q) {
-      if ($proposal_data = $proposal_q->fetchObject()) {
-        /* everything ok */
-      }
-      else {
-        \Drupal::messenger()->addmessage(t('Invalid proposal selected. Please try again.'), 'error');
-        // RedirectResponse('lab-migration/manage-proposal');
-        //return new TrustedRedirectResponse('/lab-migration/manage-proposal');
-        return;
-      }
-    }
-    else {
-      \Drupal::messenger()->addmessage(t('Invalid proposal selected. Please try again.'), 'error');
-      // RedirectResponse('lab-migration/manage-proposal');
-     // return new RedirectResponse('/lab-migration/manage-proposal');
-      return;
+    $proposal_data = $this->database->select('lab_migration_proposal')
+      ->fields('lab_migration_proposal')
+      ->condition('id', $proposal_id)
+      ->execute()
+      ->fetchObject();
+
+    if (!$proposal_data) {
+      $this->messenger->addError($this->t('Invalid proposal selected. Please try again.'));
+      return $form;
     }
 
     $form['name'] = [
       '#type' => 'item',
-      '#markup' => Link::fromTextAndUrl($proposal_data->name_title . ' ' . $proposal_data->name,Url::fromRoute('entity.user.canonical', ['user' => $proposal_data->uid]))->toString(),
-     '#title' => t('Name'),
+      '#markup' => Link::fromTextAndUrl(
+        $proposal_data->name_title . ' ' . $proposal_data->name,
+        Url::fromRoute('entity.user.canonical', ['user' => $proposal_data->uid])
+      )->toString(),
+      '#title' => $this->t('Name'),
     ];
-    // $form['email_id'] = [
-    //   '#type' => 'item',
-    //   '#markup' => User::load($proposal_data->uid)->getEmail(),
-    //   '#title' => t('Email'),
-    // ];
 
-$user = !empty($proposal_data->uid) ? User::load($proposal_data->uid) : NULL;
+    $proposal_user = $this->entityTypeManager->getStorage('user')->load($proposal_data->uid);
+    $form['email_id'] = [
+      '#type' => 'item',
+      '#markup' => $proposal_user ? $proposal_user->getEmail() : $this->t('Not available'),
+      '#title' => $this->t('Email'),
+    ];
 
-$email = $user ? $user->getEmail() : 'Not available';
-
-$form['email_id'] = [
-  '#type' => 'item',
-  '#markup' => $email,
-  '#title' => t('Email'),
-];
     $form['contact_ph'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->contact_ph,
-      '#title' => t('Contact No.'),
+      '#title' => $this->t('Contact No.'),
     ];
+
     $form['department'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->department,
-      '#title' => t('Department/Branch'),
+      '#title' => $this->t('Department/Branch'),
     ];
+
     $form['university'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->university,
-      '#title' => t('University/Institute'),
+      '#title' => $this->t('University/Institute'),
     ];
+
     $form['country'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->country,
-      '#title' => t('Country'),
+      '#title' => $this->t('Country'),
     ];
+
     $form['all_state'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->state,
-      '#title' => t('State'),
+      '#title' => $this->t('State'),
     ];
+
     $form['city'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->city,
-      '#title' => t('City'),
+      '#title' => $this->t('City'),
     ];
+
     $form['pincode'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->pincode,
-      '#title' => t('Pincode/Postal code'),
+      '#title' => $this->t('Pincode/Postal code'),
     ];
+
     $form['operating_system'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->operating_system,
-      '#title' => t('Operating System'),
+      '#title' => $this->t('Operating System'),
     ];
-    // $form['version'] = [
-    //   '#type' => 'item',
-    //   '#markup' => $proposal_data->version,
-    //   // '#markup' => Xss::filter($proposal_data->version),
-    //   '#title' => t('R Version'),
-    // ];
+
     $form['syllabus_link'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->syllabus_link,
-      '#title' => t('Syllabus Link'),
+      '#title' => $this->t('Syllabus Link'),
     ];
+
     $form['lab_title'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->lab_title,
-      '#title' => t('Title of the Lab'),
+      '#title' => $this->t('Title of the Lab'),
     ];
-    // var_dump($form);die;
+
     /* get experiment details */
     $experiment_list = '<ul>';
-    //$experiment_q = $injected_database->query("SELECT * FROM {lab_migration_experiment} WHERE proposal_id = %d ORDER BY id ASC", $proposal_id);
-    $query = \Drupal::database()->select('lab_migration_experiment');
-    $query->fields('lab_migration_experiment');
-    $query->condition('proposal_id', $proposal_id);
-    $query->orderBy('id', 'ASC');
-    $experiment_q = $query->execute();
+    $experiment_q = $this->database->select('lab_migration_experiment')
+      ->fields('lab_migration_experiment')
+      ->condition('proposal_id', $proposal_id)
+      ->orderBy('id', 'ASC')
+      ->execute();
+
     while ($experiment_data = $experiment_q->fetchObject()) {
-      $experiment_list .= '<li>' . $experiment_data->title . '</li>Description of Experiment : ' . $experiment_data->description . '<br>';
+      $experiment_list .= '<li>' . htmlspecialchars($experiment_data->title) . '</li>Description of Experiment : ' . htmlspecialchars($experiment_data->description) . '<br>';
     }
     $experiment_list .= '</ul>';
+
     $form['experiment'] = [
       '#type' => 'item',
       '#markup' => $experiment_list,
-      '#title' => t('Experiments'),
+      '#title' => $this->t('Experiments'),
     ];
+
     if ($proposal_data->solution_provider_uid == 0) {
-      $solution_provider = "User will not provide solution, we will have to provide solution";
+      $solution_provider = $this->t("User will not provide solution, we will have to provide solution");
     }
     else {
       if ($proposal_data->solution_provider_uid == $proposal_data->uid) {
-        $solution_provider = "Proposer will provide the solution of the lab";
+        $solution_provider = $this->t("Proposer will provide the solution of the lab");
       }
       else {
-        $solution_provider_user_data = User::load($proposal_data->solution_provider_uid);
-        if ($solution_provider_user_data) {
-          //$solution_provider = "Solution will be provided by user " . Link::fromTextAndUrl($solution_provider_user_data->name, 'user/' . $proposal_data->solution_provider_uid);
+        $sol_user = $this->entityTypeManager->getStorage('user')->load($proposal_data->solution_provider_uid);
+        if ($sol_user) {
+          $solution_provider = $this->t("Solution will be provided by user @user", ['@user' => $sol_user->getDisplayName()]);
         }
         else {
-          $solution_provider = "User does not exists";
+          $solution_provider = $this->t("User does not exist");
         }
       }
     }
+
     $form['solution_provider_uid'] = [
       '#type' => 'item',
-      '#title' => t('Who will provide the solution'),
+      '#title' => $this->t('Who will provide the solution'),
       '#markup' => $solution_provider,
     ];
-    /*$form['solution_display'] = array(
-    '#type' => 'item',
-    '#title' => t('Display the solution on the www.r.fossee.in website'),
-    '#markup' => ($proposal_data->solution_display == 1) ? "Yes" : "No",
-    );*/
+
     $proposal_status = '';
     switch ($proposal_data->approval_status) {
       case 0:
-        $proposal_status = t('Pending');
+        $proposal_status = $this->t('Pending');
         break;
       case 1:
-        $proposal_status = t('Approved');
+        $proposal_status = $this->t('Approved');
         break;
       case 2:
-        $proposal_status = t('Dis-approved');
+        $proposal_status = $this->t('Dis-approved');
         break;
       case 3:
-        $proposal_status = t('Completed');
+        $proposal_status = $this->t('Completed');
         break;
       default:
-        $proposal_status = t('Unkown');
+        $proposal_status = $this->t('Unknown');
         break;
     }
+
     $form['proposal_status'] = [
       '#type' => 'item',
       '#markup' => $proposal_status,
-      '#title' => t('Proposal Status'),
+      '#title' => $this->t('Proposal Status'),
     ];
-    if ($proposal_data->approval_status == 0) {
+
+    if ($proposal_data->approval_status == 0 || $proposal_data->approval_status == 1) {
       if ($proposal_data->expected_completion_date == 0) {
         $form['completion_date'] = [
           '#type' => 'item',
-          '#markup' => 'Expecting date of completion soon',
-          '#title' => t('Date of Completion'),
+          '#markup' => $this->t('Expecting date of completion soon'),
+          '#title' => ($proposal_data->approval_status == 0) ? $this->t('Expected date of completion') : $this->t('Date of Completion'),
         ];
       }
       else {
         $form['completion_date'] = [
           '#type' => 'item',
           '#markup' => date('d-m-Y', $proposal_data->expected_completion_date),
-          '#title' => t('Expected date of completion'),
+          '#title' => ($proposal_data->approval_status == 0) ? $this->t('Expected date of completion') : $this->t('Date of Completion'),
         ];
       }
     }
-    if ($proposal_data->approval_status == 1) {
-      if ($proposal_data->expected_completion_date == 0) {
-        $form['completion_date'] = [
-          '#type' => 'item',
-          '#markup' => 'Expecting date of completion soon',
-          '#title' => t('Date of Completion'),
-        ];
-      }
-      else {
-        $form['completion_date'] = [
-          '#type' => 'item',
-          '#markup' => date('d-m-Y', $proposal_data->expected_completion_date),
-          '#title' => t('Date of Completion'),
-        ];
-      }
-    }
+
     if ($proposal_data->approval_status == 0) {
       $form['approve'] = [
         '#type' => 'item',
-        //'#markup' => Link::fromTextAndUrl('Click here', 'lab-migration/manage-proposal/approve/' . $proposal_id),
-        '#title' => t('Approve'),
+        '#markup' => Link::fromTextAndUrl(
+          $this->t('Click here to approve'),
+          Url::fromRoute('lab_migration.proposal_approval_form', ['id' => $proposal_id])
+        )->toString(),
+        '#title' => $this->t('Approve'),
       ];
     }
+
     if ($proposal_data->approval_status == 1) {
       $form['completed'] = [
         '#type' => 'checkbox',
-        '#title' => t('Completed'),
-        '#description' => t('Check if user has provided all experiment solutions.'),
+        '#title' => $this->t('Completed'),
+        '#description' => $this->t('Check if user has provided all experiment solutions.'),
       ];
     }
+
     if ($proposal_data->approval_status == 2) {
       $form['message'] = [
         '#type' => 'item',
         '#markup' => $proposal_data->message,
-        '#title' => t('Reason for disapproval'),
+        '#title' => $this->t('Reason for disapproval'),
       ];
     }
-    //DATE OF COMPLETION
+
     if ($proposal_data->approval_status == 3) {
       $form['completion_date'] = [
         '#type' => 'item',
         '#markup' => date('d-m-Y', $proposal_data->expected_completion_date),
-        '#title' => t('Date of Completion'),
+        '#title' => $this->t('Date of Completion'),
       ];
     }
+
     if ($proposal_data->approval_status == 2) {
       $form['completion_date'] = [
         '#type' => 'item',
-        '#markup' => "Proposal is disapproved",
-        '#title' => t('Date of Completion'),
+        '#markup' => $this->t('Proposal is disapproved'),
+        '#title' => $this->t('Date of Completion'),
       ];
     }
+
     $form['submit'] = [
       '#type' => 'submit',
-      '#value' => t('Submit'),
+      '#value' => $this->t('Submit'),
     ];
+
     $form['cancel'] = [
       '#type' => 'markup',
-     // '#markup' => Link::fromTextAndUrl(t('Cancel'), 'lab-migration/manage-proposal/all'),
+      '#markup' => Link::fromTextAndUrl(
+        $this->t('Cancel'),
+        Url::fromRoute('lab_migration.proposal_all')
+      )->toString(),
     ];
+
     return $form;
   }
 
-  public function submitForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
-    /* get current proposal */
-    // $proposal_id = (int) arg(3);
-    $route_match = \Drupal::routeMatch();
+  /**
+   * {@inheritdoc}
+   */
+  public function submitForm(array &$form, FormStateInterface $form_state) {
+    $route_match = $this->requestStack->getCurrentRequest()->attributes->get('_route_match');
+    $proposal_id = $route_match ? (int) $route_match->getParameter('id') : 0;
 
-$proposal_id = (int) $route_match->getParameter('id');
-    //$proposal_q = $injected_database->query("SELECT * FROM {lab_migration_proposal} WHERE id = %d", $proposal_id);
-    $query = \Drupal::database()->select('lab_migration_proposal');
-    $query->fields('lab_migration_proposal');
-    $query->condition('id', $proposal_id);
-    $proposal_q = $query->execute();
-    if ($proposal_q) {
-      if ($proposal_data = $proposal_q->fetchObject()) {
-        /* everything ok */
-      }
-      else {
-        \Drupal::messenger()->addmessage(t('Invalid proposal selected. Please try again.'), 'error');
-        // RedirectResponse('lab-migration/manage-proposal');
-        $response = new RedirectResponse('/lab-migration/manage-proposal');
-        $response->send();
-        return;
-      }
-    }
-    else {
-      \Drupal::messenger()->addmessage(t('Invalid proposal selected. Please try again.'), 'error');
-      // RedirectResponse('lab-migration/manage-proposal');
-      $response = new RedirectResponse('lab_migration.proposal_pending_solution');
-$response->send();
+    $proposal_data = $this->database->select('lab_migration_proposal')
+      ->fields('lab_migration_proposal')
+      ->condition('id', $proposal_id)
+      ->execute()
+      ->fetchObject();
+
+    if (!$proposal_data) {
+      $this->messenger->addError($this->t('Invalid proposal selected. Please try again.'));
+      $form_state->setRedirect('lab_migration.proposal_all');
       return;
     }
-    /* set the book status to completed */
-    if ($form_state->getValue(['completed']) == 1) {
-      $up_query = "UPDATE lab_migration_proposal SET approval_status = :approval_status , expected_completion_date = :expected_completion_date WHERE id = :proposal_id";
-      $args = [
-        ":approval_status" => '3',
-        ":proposal_id" => $proposal_id,
-        ":expected_completion_date" => time(),
-      ];
-       $result = \Drupal::database()->query($up_query, $args);
-      
-/* Sending email */
-$user_data = User::load($proposal_data->uid);
 
-if ($user_data && $user_data->getEmail()) {
+    if ($form_state->getValue('completed') == 1) {
+      $this->database->update('lab_migration_proposal')
+        ->fields([
+          'approval_status' => 3,
+          'expected_completion_date' => time(),
+        ])
+        ->condition('id', $proposal_id)
+        ->execute();
 
-  $email_to = $user_data->getEmail();
+      $user_data = $this->entityTypeManager->getStorage('user')->load($proposal_data->uid);
+      if ($user_data && $user_data->getEmail()) {
+        $email_to = $user_data->getEmail();
+        $config = $this->configFactory()->get('lab_migration.settings');
+        $from = $config->get('lab_migration_from_email');
+        $bcc = $this->currentUser->getEmail() . ', ' . $config->get('lab_migration_emails');
+        $cc = $config->get('lab_migration_cc_emails');
 
-  $config = \Drupal::config('lab_migration.settings');
-  $from = $config->get('lab_migration_from_email');
-  $bcc  = $user->getEmail() . ', ' . $config->get('lab_migration_emails');
-  $cc   = $config->get('lab_migration_cc_emails');
+        $params['proposal_completed']['proposal_id'] = $proposal_id;
+        $params['proposal_completed']['user_id']     = $proposal_data->uid;
+        $params['proposal_completed']['headers'] = [
+          'From' => $from,
+          'Cc' => $cc,
+          'Bcc' => $bcc,
+        ];
 
-  $params['proposal_completed']['proposal_id'] = $proposal_id;
-  $params['proposal_completed']['user_id']     = $proposal_data->uid;
-  $params['proposal_completed']['headers'] = [
-    'From' => $from,
-    'MIME-Version' => '1.0',
-    'Content-Type' => 'text/plain; charset=UTF-8; format=flowed; delsp=yes',
-    'Content-Transfer-Encoding' => '8Bit',
-    'X-Mailer' => 'Drupal',
-    'Cc' => $cc,
-    'Bcc' => $bcc,
-  ];
+        if ($this->mailService->sendMail('lab_migration', 'proposal_completed', $email_to, $params)) {
+          $this->messenger->addMessage($this->t('Mail sent successfully.'));
+        }
+      }
 
-  $langcode = \Drupal::languageManager()->getDefaultLanguage()->getId();
-
-  $mailManager = \Drupal::service('plugin.manager.mail');
-
-  $result = $mailManager->mail(
-    'lab_migration',
-    'proposal_completed',
-    $email_to,
-    $langcode,
-    $params,
-    $from,
-    TRUE
-  );
-
-  if (empty($result['result'])) {
-    \Drupal::messenger()->addMessage(t('Mail sent successfully.'));
-  }
-      \Drupal::messenger()->addmessage('Congratulations! Lab Migration proposal has been marked as completed. User has been notified of the completion.', 'status');
+      $this->messenger->addMessage($this->t('Congratulations! Lab Migration proposal has been marked as completed. User has been notified of the completion.'), 'status');
+      $form_state->setRedirect('lab_migration.proposal_all');
     }
-    // RedirectResponse('lab-migration/manage-proposal');
-    $response = new RedirectResponse(Url::fromRoute('lab_migration.proposal_all')->toString());
-  
-    // //   // Send the redirect response
-      $response->send();
-    return;
   }
-  }
+
 }
-?>
