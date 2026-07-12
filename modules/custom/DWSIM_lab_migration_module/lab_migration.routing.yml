@@ -65,10 +65,11 @@ lab_migration.proposal_approval_form:
   requirements:
     _permission: 'lab migration manage proposal'
 lab_migration.solution_proposal_approval_form:
-  path: /lab-migration/manage-proposal/solution-proposal-approve
+  path: /lab-migration/manage-proposal/solution-proposal-approve/{proposal_id}
   defaults:
     _title: 'Approve Solution Proposal'
     _form: \Drupal\lab_migration\Form\LabMigrationSolutionProposalApprovalForm
+    proposal_id: 0
   requirements:
     _permission: 'lab migration manage proposal'
 lab_migration.proposal_edit_form:
@@ -125,17 +126,19 @@ lab_migration.bulk_approval_form:
   requirements:
     _permission: 'lab migration bulk manage code'
 lab_migration.bulk_upload_code_form:
-  path: /lab-migration/code-approval/upload
+  path: /lab-migration/code-approval/upload/{proposal_id}
   defaults:
     _title: 'Upload Code'
     _form: \Drupal\lab_migration\Form\LabMigrationBulkUploadCodeForm
+    proposal_id: 0
   requirements:
     _permission: 'lab migration bulk manage code'
 lab_migration.lab_notes_form:
-  path: /lab-migration/code-approval/notes
+  path: /lab-migration/code-approval/notes/{proposal_id}
   defaults:
     _title: 'Notes for Reviewers'
     _form: \Drupal\lab_migration\Form\LabMigrationLabNotesForm
+    proposal_id: 0
   requirements:
     _permission: 'lab migration bulk manage code'
 lab_migration.list_experiments:
