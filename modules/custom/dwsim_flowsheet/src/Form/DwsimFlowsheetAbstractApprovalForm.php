@@ -9,9 +9,38 @@ namespace Drupal\dwsim_flowsheet\Form;
 
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\Element;
+use Drupal\Core\Link;
+use Drupal\Core\Url;
+use Drupal\dwsim_flowsheet\Services\MailService;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 class DwsimFlowsheetAbstractApprovalForm extends FormBase {
+
+  /**
+   * The mail helper service.
+   *
+   * @var \Drupal\dwsim_flowsheet\Services\MailService
+   */
+  protected $mailHelper;
+
+  /**
+   * Constructs a DwsimFlowsheetAbstractApprovalForm object.
+   *
+   * @param \Drupal\dwsim_flowsheet\Services\MailService $mail_helper
+   *   The mail helper service.
+   */
+  public function __construct(MailService $mail_helper) {
+    $this->mailHelper = $mail_helper;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('dwsim_flowsheet.mail_helper')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -253,43 +282,16 @@ class DwsimFlowsheetAbstractApprovalForm extends FormBase {
     if ($form_state->getValue(['approved']) == "0") {
       $query = "UPDATE {lab_migration_solution} SET approval_status = 0, approver_uid = :approver_uid, approval_date = :approval_date WHERE id = :solution_id";
       $args = [
-        ":approver_uid" => $user->uid,
+        ":approver_uid" => $user->id(),
         ":approval_date" => time(),
         ":solution_id" => $solution_id,
       ];
       \Drupal::database()->query($query, $args);
       /* sending email */
-      $email_to = $user_data->mail;
-      // @FIXME
-      // // @FIXME
-      // // This looks like another module's variable. You'll need to rewrite this call
-      // // to ensure that it uses the correct configuration object.
-      // $from = variable_get('lab_migration_from_email', '');
-
-      // @FIXME
-      // // @FIXME
-      // // This looks like another module's variable. You'll need to rewrite this call
-      // // to ensure that it uses the correct configuration object.
-      // $bcc = variable_get('lab_migration_emails', '');
-
-      // @FIXME
-      // // @FIXME
-      // // This looks like another module's variable. You'll need to rewrite this call
-      // // to ensure that it uses the correct configuration object.
-      // $cc = variable_get('lab_migration_cc_emails', '');
-
+      $email_to = $user_data->getEmail();
       $param['solution_pending']['solution_id'] = $solution_id;
-      $param['solution_pending']['user_id'] = $user_data->uid;
-      $param['solution_pending']['headers'] = [
-        'From' => $from,
-        'MIME-Version' => '1.0',
-        'Content-Type' => 'text/plain; charset=UTF-8; format=flowed; delsp=yes',
-        'Content-Transfer-Encoding' => '8Bit',
-        'X-Mailer' => 'Drupal',
-        'Cc' => $cc,
-        'Bcc' => $bcc,
-      ];
-      if (!drupal_mail('lab_migration', 'solution_pending', $email_to, language_default(), $param, $from, TRUE)) {
+      $param['solution_pending']['user_id'] = $user_data->id();
+      if (!$this->mailHelper->sendMail('lab_migration', 'solution_pending', $email_to, $param)) {
         \Drupal::messenger()->addError('Error sending email message.');
       }
     }
@@ -297,43 +299,16 @@ class DwsimFlowsheetAbstractApprovalForm extends FormBase {
       if ($form_state->getValue(['approved']) == "1") {
         $query = "UPDATE {lab_migration_solution} SET approval_status = 1, approver_uid = :approver_uid, approval_date = :approval_date WHERE id = :solution_id";
         $args = [
-          ":approver_uid" => $user->uid,
+          ":approver_uid" => $user->id(),
           ":approval_date" => time(),
           ":solution_id" => $solution_id,
         ];
         \Drupal::database()->query($query, $args);
         /* sending email */
-        $email_to = $user_data->mail;
-        // @FIXME
-        // // @FIXME
-        // // This looks like another module's variable. You'll need to rewrite this call
-        // // to ensure that it uses the correct configuration object.
-        // $from = variable_get('lab_migration_from_email', '');
-
-        // @FIXME
-        // // @FIXME
-        // // This looks like another module's variable. You'll need to rewrite this call
-        // // to ensure that it uses the correct configuration object.
-        // $bcc = variable_get('lab_migration_emails', '');
-
-        // @FIXME
-        // // @FIXME
-        // // This looks like another module's variable. You'll need to rewrite this call
-        // // to ensure that it uses the correct configuration object.
-        // $cc = variable_get('lab_migration_cc_emails', '');
-
+        $email_to = $user_data->getEmail();
         $param['solution_approved']['solution_id'] = $solution_id;
-        $param['solution_approved']['user_id'] = $user_data->uid;
-        $param['solution_approved']['headers'] = [
-          'From' => $from,
-          'MIME-Version' => '1.0',
-          'Content-Type' => 'text/plain; charset=UTF-8; format=flowed; delsp=yes',
-          'Content-Transfer-Encoding' => '8Bit',
-          'X-Mailer' => 'Drupal',
-          'Cc' => $cc,
-          'Bcc' => $bcc,
-        ];
-        if (!drupal_mail('lab_migration', 'solution_approved', $email_to, language_default(), $param, $from, TRUE)) {
+        $param['solution_approved']['user_id'] = $user_data->id();
+        if (!$this->mailHelper->sendMail('lab_migration', 'solution_approved', $email_to, $param)) {
           \Drupal::messenger()->addError('Error sending email message.');
         }
       }
@@ -341,41 +316,14 @@ class DwsimFlowsheetAbstractApprovalForm extends FormBase {
         if ($form_state->getValue(['approved']) == "2") {
           if (lab_migration_delete_solution($solution_id)) {
             /* sending email */
-            $email_to = $user_data->mail;
-            // @FIXME
-            // // @FIXME
-            // // This looks like another module's variable. You'll need to rewrite this call
-            // // to ensure that it uses the correct configuration object.
-            // $from = variable_get('lab_migration_from_email', '');
-
-            // @FIXME
-            // // @FIXME
-            // // This looks like another module's variable. You'll need to rewrite this call
-            // // to ensure that it uses the correct configuration object.
-            // $bcc = variable_get('lab_migration_emails', '');
-
-            // @FIXME
-            // // @FIXME
-            // // This looks like another module's variable. You'll need to rewrite this call
-            // // to ensure that it uses the correct configuration object.
-            // $cc = variable_get('lab_migration_cc_emails', '');
-
+            $email_to = $user_data->getEmail();
             $param['solution_disapproved']['experiment_number'] = $experiment_data->number;
             $param['solution_disapproved']['experiment_title'] = $experiment_data->title;
             $param['solution_disapproved']['solution_number'] = $solution_data->code_number;
             $param['solution_disapproved']['solution_caption'] = $solution_data->caption;
-            $param['solution_disapproved']['user_id'] = $user_data->uid;
+            $param['solution_disapproved']['user_id'] = $user_data->id();
             $param['solution_disapproved']['message'] = $form_state->getValue(['message']);
-            $param['solution_disapproved']['headers'] = [
-              'From' => $from,
-              'MIME-Version' => '1.0',
-              'Content-Type' => 'text/plain; charset=UTF-8; format=flowed; delsp=yes',
-              'Content-Transfer-Encoding' => '8Bit',
-              'X-Mailer' => 'Drupal',
-              'Cc' => $cc,
-              'Bcc' => $bcc,
-            ];
-            if (!drupal_mail('lab_migration', 'solution_disapproved', $email_to, language_default(), $param, $from, TRUE)) {
+            if (!$this->mailHelper->sendMail('lab_migration', 'solution_disapproved', $email_to, $param)) {
               \Drupal::messenger()->addError('Error sending email message.');
             }
           }
