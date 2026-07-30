@@ -139,17 +139,19 @@ textbook_companion.search_form:
   requirements:
     _permission: 'access content'
 textbook_companion.browse_book:
-  path: /textbook-companion/textbook-search/book
+  path: /textbook-companion/textbook-search/book/{character}
   defaults:
     _title: 'By Book Title'
     _controller: '\Drupal\textbook_companion\Controller\DefaultController::textbook_companion_browse_book'
+    character: ''
   requirements:
     _permission: 'access content'
 textbook_companion.browse_author:
-  path: /textbook-companion/textbook-search/author
+  path: /textbook-companion/textbook-search/author/{character}
   defaults:
     _title: 'By Author'
     _controller: '\Drupal\textbook_companion\Controller\DefaultController::textbook_companion_browse_author'
+    character: ''
   requirements:
     _permission: 'access content'
 textbook_companion.browse_college_form:
@@ -160,10 +162,11 @@ textbook_companion.browse_college_form:
   requirements:
     _permission: 'access content'
 textbook_companion.browse_student:
-  path: /textbook-companion/textbook-search/student
+  path: /textbook-companion/textbook-search/student/{character}
   defaults:
     _title: 'By Student'
     _controller: '\Drupal\textbook_companion\Controller\DefaultController::textbook_companion_browse_student'
+    character: ''
   requirements:
     _permission: 'access content'
 textbook_companion.completed_books:
@@ -230,10 +233,11 @@ textbook_companion.download_full_book:
   requirements:
     _permission: 'download books to review'
 textbook_companion.delete_book:
-  path: /textbook-companion/delete-book
+  path: /textbook-companion/delete-book/{book_id}
   defaults:
     _title: 'Delete Book PDF'
     _controller: '\Drupal\textbook_companion\Controller\DefaultController::textbook_companion_delete_book'
+    book_id: ''
   requirements:
     _permission: 'approve code'
 textbook_companion.ajax:
@@ -258,10 +262,11 @@ textbook_companion._data_entry_proposal_all:
   requirements:
     _permission: 'dataentry book proposal'
 textbook_companion.dataentry_edit:
-  path: /textbook-companion/dataentry-edit
+  path: /textbook-companion/dataentry-edit/{id}
   defaults:
     _title: 'Edit book details'
     _controller: '\Drupal\textbook_companion\Controller\DefaultController::dataentry_edit'
+    id: ''
   requirements:
     _permission: 'dataentry book proposal'
 textbook_companion.cheque_proposal_all:
@@ -286,12 +291,14 @@ textbook_companion.cheque_contct_form:
   requirements:
     _permission: 'cheque contct form'
 textbook_companion.cheque_status_form:
-  path: /textbook-companion/cheque-contact/status
+  path: '/textbook-companion/cheque-contact/status/{proposal_id}'
   defaults:
     _title: 'Cheque Status'
     _form: \Drupal\textbook_companion\Form\ChequeStatusForm
+    proposal_id: null
   requirements:
     _permission: 'cheque status form'
+    proposal_id: '\d+'
 textbook_companion.cheque_report_form:
   path: /textbook-companion/cheque-contct/report
   defaults:
@@ -307,12 +314,14 @@ textbook_companion.cheque_report_form:
 #   requirements:
 #     _permission: 'list all certificates'
 textbook_companion.generate_pdf:
-  path: /textbook-companion/certificates/generate_pdf
+  path: '/textbook-companion/certificates/generate_pdf/{proposal_id}'
   defaults:
     _title: 'Download Certificate'
     _form: \Drupal\textbook_companion\Form\GeneratePdf
+    proposal_id: null
   requirements:
     _permission: 'generate pdf'
+    proposal_id: '\d+'
 # textbook_companion.verify_certificates:
 #   path: /textbook-companion/certificates/verify
 #   defaults:
@@ -321,12 +330,14 @@ textbook_companion.generate_pdf:
 #   requirements:
 #     _permission: 'verify certificates'
 textbook_companion.paper_submission_form:
-  path: /textbook-companion/manage-proposal/paper-submission
+  path: '/textbook-companion/manage-proposal/paper-submission/{proposal_id}'
   defaults:
     _title: 'Application Submission'
     _form: \Drupal\textbook_companion\Form\PaperSubmissionForm
+    proposal_id: null
   requirements:
     _permission: 'paper submission form'
+    proposal_id: '\d+'
 # textbook_companion.nonaicte_proposal_all:
 #   path: /textbook-companion/nonaicte-proposal
 #   defaults:
@@ -334,3 +345,12 @@ textbook_companion.paper_submission_form:
 #     _controller: '\Drupal\textbook_companion\Controller\DefaultController::textbook_companion_nonaicte_proposal_all'
 #   requirements:
 #     _permission: 'create book proposal'
+
+textbook_companion.edit_code_submission_form:
+  path: /textbook-companion/code-approval/edit-code-submission/{preference_id}
+  defaults:
+    _title: 'Edit Code Submission'
+    _form: \Drupal\textbook_companion\Form\EditCodeSubmissionForm
+  requirements:
+    _permission: 'approve code'
+
