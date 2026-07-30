@@ -1,3 +1,18 @@
 services:
   textbook_companion_global:
     class: '\Drupal\textbook_companion\Services\TextbookCompanionGlobalFunction'
+    arguments:
+      - '@database'
+      - '@messenger'
+      - '@current_user'
+      - '@module_handler'
+      - '@file_system'
+      - '@textbook_companion.mail_service'
+
+  textbook_companion.mail_service:
+    class: '\Drupal\textbook_companion\Services\MailService'
+    arguments: ['@plugin.manager.mail', '@logger.factory', '@config.factory', '@language_manager']
+
+  textbook_companion.ajax_helper:
+    class: '\Drupal\textbook_companion\Services\AjaxHelper'
+    arguments: ['@renderer']
