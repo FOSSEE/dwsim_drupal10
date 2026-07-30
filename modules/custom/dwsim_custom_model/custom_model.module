@@ -598,11 +598,12 @@ function custom_model_permission()
 /* AJAX CALLS */
 function custom_model_ajax()
   {
-    $query_type = arg(2);
+    $path_parts = explode('/', trim(\Drupal::request()->getPathInfo(), '/'));
+    $query_type = $path_parts[2] ?? '';
     if ($query_type == 'chapter_title')
       {
-        $chapter_number = arg(3);
-        $preference_id = arg(4);
+        $chapter_number = $path_parts[3] ?? '';
+        $preference_id = $path_parts[4] ?? '';
         //$chapter_q = \Drupal::database()->query("SELECT * FROM {custom_model_chapter} WHERE number = %d AND preference_id = %d LIMIT 1", $chapter_number, $preference_id);
         $query = \Drupal::database()->select('custom_model_chapter');
         $query->fields('custom_model_chapter');
@@ -618,9 +619,9 @@ function custom_model_ajax()
       }
     else if ($query_type == 'example_exists')
       {
-        $chapter_number = arg(3);
-        $preference_id = arg(4);
-        $example_number = arg(5);
+        $chapter_number = $path_parts[3] ?? '';
+        $preference_id = $path_parts[4] ?? '';
+        $example_number = $path_parts[5] ?? '';
         $chapter_id = 0;
         $query = \Drupal::database()->select('custom_model_chapter');
         $query->fields('custom_model_chapter');
