@@ -762,8 +762,8 @@ function _cm_list_of_pincodes()
 function _cm_dir_name($project, $proposar_name)
 {
 
-    $project_title = ucname($project);
-    $proposar_name = ucname($proposar_name);
+    $project_title = custom_model_ucname($project);
+    $proposar_name = custom_model_ucname($proposar_name);
     $dir_name = $project_title . ' By ' . $proposar_name;
     $directory_name = str_replace("__", "_", str_replace(" ", "_", str_replace("/", " ", $dir_name)));
     return $directory_name;
