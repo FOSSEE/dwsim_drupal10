@@ -20,7 +20,7 @@ use Drupal\Core\Render\RendererInterface;
 
 use Drupal\dwsim_flowsheet\Services\MailService;
 use Drupal\dwsim_flowsheet\Services\AjaxHelper;
-use Drupal\Core\DependencyInjection\ContainerInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 class DwsimFlowsheetAbstractBulkApprovalForm extends FormBase {
 

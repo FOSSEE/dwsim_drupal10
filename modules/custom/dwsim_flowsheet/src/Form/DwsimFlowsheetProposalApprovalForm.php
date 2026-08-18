@@ -19,7 +19,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Mail\MailManagerInterface;
-use Drupal\Core\DependencyInjection\ContainerInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Session\AccountProxy;
 
 use Drupal\dwsim_flowsheet\Services\MailService;

@@ -24,7 +24,7 @@ use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\Database\Database;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Mail\MailManager;
-use Drupal\Core\DependencyInjection\ContainerInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\dwsim_flowsheet\Services\AjaxHelper;
 
 class DwsimFlowsheetCompletedTabForm extends FormBase {

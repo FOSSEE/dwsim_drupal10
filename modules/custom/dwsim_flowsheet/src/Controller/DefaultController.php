@@ -801,7 +801,7 @@ public function dwsim_flowsheet_download_full_project() {
   public function dwsim_flowsheet_download_proposals() {
     $root_path = dwsim_flowsheet_path();
 
-    $result = \Drupal::database()->query("SELECT e.contributor_name as contirbutor_name, u.mail as email_id, e.project_title as title, e.contact_no as contact, e.university as university, from_unixtime(creation_date,'%d-%m-%Y') as creation, from_unixtime(approval_date,'%d-%m-%Y') as approval, from_unixtime(actual_completion_date,'%d-%m-%Y') as year, e.approval_status as status FROM dwsim_flowsheet_proposal as e JOIN users as u ON e.uid = u.uid ORDER BY actual_completion_date DESC");
+    $result = \Drupal::database()->query("SELECT e.contributor_name as contirbutor_name, u.mail as email_id, e.project_title as title, e.contact_no as contact, e.university as university, from_unixtime(creation_date,'%d-%m-%Y') as creation, from_unixtime(approval_date,'%d-%m-%Y') as approval, from_unixtime(actual_completion_date,'%d-%m-%Y') as year, e.approval_status as status FROM dwsim_flowsheet_proposal as e JOIN users_field_data as u ON e.uid = u.uid AND u.default_langcode = 1 ORDER BY actual_completion_date DESC");
 
     //var_dump($result->rowCount());die();
     //$all_proposals_q = $result->execute();
