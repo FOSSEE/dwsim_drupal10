@@ -747,64 +747,6 @@ class DefaultController extends ControllerBase {
 
   return $response;
 }
-  // Get root path (assuming this function exists in your module).
-  $root_path =\Drupal::service("textbook_companion_global")->textbook_companion_path();
-
-  // Database query using Drupal 10 Database API.
-  // $connection = \Drupal::database();
-  // $query = $connection->select('textbook_companion_preference', 'tcp')
-  //   ->join('textbook_companion_chapter', 'tcc', 'tcp.id = tcc.preference_id')
-  //   ->join('textbook_companion_example', 'tce', 'tcc.id = tce.chapter_id')
-  //   ->join('textbook_companion_example_files', 'tcef', 'tce.id = tcef.example_id')
-  //       ->fields('tcef')
-
-  //   ->condition('tcef.id', $example_file_id)
-  //   ->range(0, 1);
-
-  $connection = \Drupal::database();
-
-$query = $connection->select('textbook_companion_preference', 'tcp');
-$query->join('textbook_companion_chapter', 'tcc', 'tcp.id = tcc.preference_id');
-$query->join('textbook_companion_example', 'tce', 'tcc.id = tce.chapter_id');
-$query->join('textbook_companion_example_files', 'tcef', 'tce.id = tcef.example_id');
-
-// Fetch both file info and directory name
-$query->fields('tcef');
-$query->addField('tcp', 'directory_name', 'directory_name');
-
-$query->condition('tcef.id', $example_file_id);
-$query->range(0, 1);
-
-
-// Execute.
-
-  $example_file_data = $query->execute()->fetchObject();
-
-  if (!$example_file_data) {
-    throw new \Symfony\Component\HttpKernel\Exception\NotFoundHttpException();
-  }
-
-  // Build full file path.
-  $file_path = $root_path . $example_file_data->directory_name . '/' . $example_file_data->filepath;
-
-  // var_dump( $example_file_data->directory_name);die;
-  if (!file_exists($file_path)) {
-    throw new \Symfony\Component\HttpKernel\Exception\NotFoundHttpException('File not found.');
-  }
-
-  // Prepare response using Symfony's BinaryFileResponse.
-  $response = new BinaryFileResponse($file_path);
-  $response->setContentDisposition(
-    ResponseHeaderBag::DISPOSITION_ATTACHMENT,
-    $example_file_data->filename
-  );
-  $response->headers->set('Content-Type', $example_file_data->filemime);
-  $response->headers->set('Content-Length', filesize($file_path));
-
-  return $response;
-}
-
-
 
   public function textbook_companion_download_sample_code($proposal_id = NULL) {
     if (!$proposal_id) {
