@@ -899,57 +899,6 @@ function default_value_for_uploaded_files($filetype, $proposal_id) {
     $response->send();
   }
 
-}
-
-function default_value_for_selections($operation, $proposal_id) {
-  $query = Database::getConnection()->select('dwsim_flowsheet_submitted_abstracts', 'a');
-  $query->fields('a');
-  $query->condition('proposal_id', $proposal_id);
-  $abstracts_q = $query->execute()->fetchObject();
-
-  $selected_package_array = [];
-
-  if ($abstracts_q) {
-      if ($operation === "unit_operations_used_in_dwsim" && !empty($abstracts_q->unit_operations_used_in_dwsim)) {
-          $selected_package_array = array_map('trim', explode(',', $abstracts_q->unit_operations_used_in_dwsim));
-      } elseif ($operation === "thermodynamic_packages_used" && !empty($abstracts_q->thermodynamic_packages_used)) {
-          $selected_package_array = array_map('trim', explode(',', $abstracts_q->thermodynamic_packages_used));
-      } elseif ($operation === "logical_blocks_used" && !empty($abstracts_q->logical_blocks_used)) {
-          $selected_package_array = array_map('trim', explode(',', $abstracts_q->logical_blocks_used));
-      } elseif ($operation === "dwsim_database_compound_name") {
-          $query = Database::getConnection()->select('dwsim_flowsheet_proposal', 'p');
-          $query->fields('p');
-          $query->condition('id', $proposal_id);
-          $proposal_q = $query->execute()->fetchObject();
-
-          if (!empty($proposal_q->dwsim_database_compound_name)) {
-              $selected_package_array = array_map('trim', explode('| ', $proposal_q->dwsim_database_compound_name));
-          }
-      }
-  }
-
-  return $selected_package_array;
-}
-
-function default_value_for_uploaded_files($filetype, $proposal_id) {
-  $selected_files_array = null;
-
-  if (in_array($filetype, ['A', 'S'])) {
-      $query = Database::getConnection()->select('dwsim_flowsheet_submitted_abstracts_file', 'f');
-      $query->fields('f');
-      $query->condition('proposal_id', $proposal_id);
-      $query->condition('filetype', $filetype);
-      $selected_files_array = $query->execute()->fetchObject();
-  } elseif ($filetype === "UDC") {
-      $query = Database::getConnection()->select('dwsim_flowsheet_proposal', 'p');
-      $query->fields('p');
-      $query->condition('id', $proposal_id);
-      $selected_files_array = $query->execute()->fetchObject();
-  }
-
-  return $selected_files_array;
-}
-
   /**
    * AJAX callback: returns the user-defined compounds wrapper.
    */
