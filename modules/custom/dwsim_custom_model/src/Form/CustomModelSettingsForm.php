@@ -124,7 +124,7 @@ class CustomModelSettingsForm extends ConfigFormBase {
     ->set('custom_model_simulation_file', $form_state->getValue(['custom_model_upload']))
     ->set('custom_model_script_file', $form_state->getValue(['custom_model_script_upload']))
     ->save();
-    \Drupal::messenger()->addMessage(t('Settings updated'), 'status');
+    $this->messenger()->addStatus($this->t('Settings updated'));
   }
 
 }

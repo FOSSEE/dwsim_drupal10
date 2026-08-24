@@ -1,10 +1,12 @@
 services:
   custom_model_global:
     class: '\Drupal\custom_model\Services\CustomModelGlobalfunction'
+    arguments: ['@database', '@messenger', '@current_user']
 
-  # lab_migration_email:
-  #   class:  '\Drupal\lab_migration\Services\LabMigrationEmailFunction'
+  custom_model.mail_helper:
+    class: '\Drupal\custom_model\Services\MailService'
+    arguments: ['@plugin.manager.mail', '@logger.factory', '@config.factory', '@language_manager']
 
-  # lab_migration.form.lab_migration_proposal_approval:
-  #   class: Drupal\lab_migration\Form\LabMigrationProposalApprovalForm
-  #   arguments: ['@plugin.manager.mail']
+  custom_model.ajax_helper:
+    class: '\Drupal\custom_model\Services\AjaxHelper'
+    arguments: ['@renderer']

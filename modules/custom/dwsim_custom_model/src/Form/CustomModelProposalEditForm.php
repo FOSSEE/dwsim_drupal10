@@ -13,16 +13,44 @@ use Drupal\Core\Render\Element;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Drupal\Core\Url;
 use Drupal\Core\Link;
-use Drupal\user\Entity\User;
-use Symfony\Component\HttpFoundation\Response;
+use Drupal\Core\Database\Connection;
+use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
-use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Mail\MailManagerInterface;
-use Drupal\Core\DependencyInjection\ContainerInterface;
-use Drupal\Core\Mail\MailManager;
-use Drupal\Core\Session\AccountProxy;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 class CustomModelProposalEditForm extends FormBase {
+
+  protected $connection;
+  protected $messenger;
+  protected $currentUser;
+  protected $routeMatch;
+  protected $entityTypeManager;
+
+  public function __construct(
+    Connection $connection,
+    MessengerInterface $messenger,
+    AccountInterface $currentUser,
+    RouteMatchInterface $routeMatch,
+    EntityTypeManagerInterface $entityTypeManager
+  ) {
+    $this->connection        = $connection;
+    $this->messenger         = $messenger;
+    $this->currentUser       = $currentUser;
+    $this->routeMatch        = $routeMatch;
+    $this->entityTypeManager = $entityTypeManager;
+  }
+
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('database'),
+      $container->get('messenger'),
+      $container->get('current_user'),
+      $container->get('current_route_match'),
+      $container->get('entity_type.manager')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -32,36 +60,17 @@ class CustomModelProposalEditForm extends FormBase {
   }
 
   public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
-    /* get current proposal */
-    // $proposal_id = (int) arg(3);
-    $route_match = \Drupal::routeMatch();
-$proposal_id = (int) $route_match->getParameter('id');
-
-    //$proposal_q = \Drupal::database()->query("SELECT * FROM {custom_model_proposal} WHERE id = %d", $proposal_id);
-    $query = \Drupal::database()->select('custom_model_proposal');
-    $query->fields('custom_model_proposal');
-    $query->condition('id', $proposal_id);
-    $proposal_q = $query->execute();
-    if ($proposal_q) {
-      if ($proposal_data = $proposal_q->fetchObject()) {
-        /* everything ok */
-      } //$proposal_data = $proposal_q->fetchObject()
-      else {
-        \Drupal::messenger()->addMessage(t('Invalid proposal selected. Please try again.'), 'error');
-        // drupal_goto('custom-model/manage-proposal');
-        $url = Url::fromUri('internal:/custom-model/manage-proposal/edit/')->toString();
-
-        return;
-      }
-    } //$proposal_q
-    else {
-      \Drupal::messenger()->addMessage(t('Invalid proposal selected. Please try again.'), 'error');
-      // drupal_goto('custom-model/manage-proposal');
-      $url = Url::fromUri('internal:/custom-model/manage-proposal/edit/')->toString();
-      return;
+    $proposal_id = (int) $this->routeMatch->getParameter('id');
+    $proposal_data = $this->connection->select('custom_model_proposal')
+      ->fields('custom_model_proposal')
+      ->condition('id', $proposal_id)
+      ->execute()
+      ->fetchObject();
+    if (!$proposal_data) {
+      $this->messenger->addError($this->t('Invalid proposal selected. Please try again.'));
+      return [];
     }
-    $user_data = User::load($proposal_data->uid);
+    $user_data = $this->entityTypeManager->getStorage('user')->load($proposal_data->uid);
     $form['name_title'] = [
       '#type' => 'select',
       '#title' => t('Title'),
@@ -305,32 +314,15 @@ $proposal_id = (int) $route_match->getParameter('id');
   }
 
   public function submitForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
-    /* get current proposal */
-    // $proposal_id = (int) arg(3);
-    $route_match = \Drupal::routeMatch();
-    $proposal_id = (int) $route_match->getParameter('id');
-    $query = \Drupal::database()->select('custom_model_proposal');
-    $query->fields('custom_model_proposal');
-    $query->condition('id', $proposal_id);
-    $proposal_q = $query->execute();
-    if ($proposal_q) {
-      if ($proposal_data = $proposal_q->fetchObject()) {
-        /* everything ok */
-      } //$proposal_data = $proposal_q->fetchObject()
-      else {
-        \Drupal::messenger()->addMessage(t('Invalid proposal selected. Please try again.'), 'error');
-        // drupal_goto('custom-model/manage-proposal');
-        return new RedirectResponse('/custom-model/manage-proposal/all');
-        // return;
-      }
-    } //$proposal_q
-    else {
-      \Drupal::messenger()->addMessage(t('Invalid proposal selected. Please try again.'), 'error');
-      // drupal_goto('custom-model/manage-proposal');
+    $proposal_id = (int) $this->routeMatch->getParameter('id');
+    $proposal_data = $this->connection->select('custom_model_proposal')
+      ->fields('custom_model_proposal')
+      ->condition('id', $proposal_id)
+      ->execute()
+      ->fetchObject();
+    if (!$proposal_data) {
+      $this->messenger->addError($this->t('Invalid proposal selected. Please try again.'));
       return new RedirectResponse('/custom-model/manage-proposal/all');
-
-      return;
     }
     /* delete proposal */
     if ($form_state->getValue(['delete_proposal']) == 1) {
@@ -354,17 +346,14 @@ $proposal_id = (int) $route_match->getParameter('id');
       // if (!drupal_mail('custom_model', 'custom_model_proposal_deleted', $email_to, user_preferred_language($user), $params, $from, TRUE)) {
       //   \Drupal::messenger()->addMessage('Error sending email message.', 'error');
       // }
-      \Drupal::messenger()->addMessage(t('Custom model proposal has been deleted.'), 'status');
+      $this->messenger->addStatus($this->t('Custom model proposal has been deleted.'));
       if (\Drupal::service("custom_model_global")->cm_rrmdir_project($proposal_id) == TRUE) {
-        $query = \Drupal::database()->delete('custom_model_proposal');
-        $query->condition('id', $proposal_id);
-        $num_deleted = $query->execute();
-        \Drupal::messenger()->addMessage(t('Proposal Deleted'), 'status');
-        // drupal_goto('custom-model/manage-proposal');
+        $this->connection->delete('custom_model_proposal')
+          ->condition('id', $proposal_id)
+          ->execute();
+        $this->messenger->addStatus($this->t('Proposal Deleted'));
         return new RedirectResponse('/custom-model/manage-proposal/all');
-
-        return;
-      } //rrmdir_project($proposal_id) == TRUE
+      }
     } //$form_state['values']['delete_proposal'] == 1
 	/* update proposal */
     $v = $form_state->getValues();
@@ -404,14 +393,9 @@ $proposal_id = (int) $route_match->getParameter('id');
       ':samplefilepath' => $samplefilepath,
       ':proposal_id' => $proposal_id,
     ];
-    $result = \Drupal::database()->query($query, $args);
-    \Drupal::messenger()->addMessage(t('Proposal Updated'), 'status');
-        // RedirectResponse('lab-migration/manage-proposal');
-        $response = new RedirectResponse(Url::fromRoute('custom_model.proposal_all')->toString());
-  
-        // //   // Send the redirect response
-          $response->send();
-      
+    $result = $this->connection->query($query, $args);
+    $this->messenger->addStatus($this->t('Proposal Updated'));
+    $form_state->setRedirectUrl(Url::fromRoute('custom_model.proposal_all'));
   }
   
 

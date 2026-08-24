@@ -19,10 +19,37 @@ use Symfony\Component\HttpFoundation\Response;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Mail\MailManagerInterface;
-use Drupal\Core\DependencyInjection\ContainerInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Session\AccountProxy;
 
+use Drupal\dwsim_flowsheet\Services\MailService;
+
 class DwsimFlowsheetProposalApprovalForm extends FormBase {
+
+  /**
+   * The mail helper service.
+   *
+   * @var \Drupal\dwsim_flowsheet\Services\MailService
+   */
+  protected $mailHelper;
+
+  /**
+   * Constructs a DwsimFlowsheetProposalApprovalForm object.
+   *
+   * @param \Drupal\dwsim_flowsheet\Services\MailService $mail_helper
+   */
+  public function __construct(MailService $mail_helper) {
+    $this->mailHelper = $mail_helper;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('dwsim_flowsheet.mail_helper')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -49,24 +76,12 @@ class DwsimFlowsheetProposalApprovalForm extends FormBase {
       } //$proposal_data = $proposal_q->fetchObject()
       else {
         \Drupal::messenger()->addError(t('Invalid proposal selected. Please try again.'));
-        $url = Url::fromRoute('dwsim_flowsheet.proposal_approval_form')->toString();
-        \Drupal::service('request_stack')->getCurrentRequest()->query->set('destination', $url); 
-        // drupal_goto('flowsheeting-project/manage-proposal');
-        $response = new RedirectResponse(Url::fromRoute('dwsim_flowsheet.proposal_pending_0')->toString());
-        // Send the redirect response
-        $response->send();
-        return;
+        return new RedirectResponse(Url::fromRoute('dwsim_flowsheet.proposal_pending_0')->toString());
       }
     } //$proposal_q
     else {
       \Drupal::messenger()->addError(t('Invalid proposal selected. Please try again.'));
-      $url = Url::fromRoute('dwsim_flowsheet.proposal_approval_form')->toString();
-      \Drupal::service('request_stack')->getCurrentRequest()->query->set('destination', $url);
-      // drupal_goto('flowsheeting-project/manage-proposal');
-      $response = new RedirectResponse(Url::fromRoute('dwsim_flowsheet.proposal_pending_0')->toString());
-      // Send the redirect response
-      $response->send();
-      return;
+      return new RedirectResponse(Url::fromRoute('dwsim_flowsheet.proposal_pending_0')->toString());
     }
     if ($proposal_data->project_guide_name == "NULL" || $proposal_data->project_guide_name == "") {
       $project_guide_name = "Not Entered";
@@ -301,19 +316,13 @@ $form['cancel'] = [
       } //$proposal_data = $proposal_q->fetchObject()
       else {
         \Drupal::messenger()->addError(t('Invalid proposal selected. Please try again.'));
-        // drupal_goto('flowsheeting-project/manage-proposal');
-        $response = new RedirectResponse(Url::fromRoute('dwsim_flowsheet.proposal_pending_0')->toString());
-        // Send the redirect response
-        $response->send();
+        $form_state->setRedirect('dwsim_flowsheet.proposal_pending_0');
         return;
       }
     } //$proposal_q
     else {
       \Drupal::messenger()->addError(t('Invalid proposal selected. Please try again.'));
-      // drupal_goto('flowsheeting-project/manage-proposal');
-      $response = new RedirectResponse(Url::fromRoute('dwsim_flowsheet.proposal_pending_0')->toString());
-      // Send the redirect response
-      $response->send();
+      $form_state->setRedirect('dwsim_flowsheet.proposal_pending_0');
       return;
     }
     if ($form_state->getValue(['approval']) == 1) {
@@ -326,39 +335,16 @@ $form['cancel'] = [
       \Drupal::database()->query($query, $args);
       /* sending email */
       $user_data = \Drupal::entityTypeManager()->getStorage('user')->load($proposal_data->uid);
-      $email_to = $user_data->mail;
-      $from = \Drupal::config('dwsim_flowsheet.settings')->get('dwsim_flowsheet_from_email');
-      $bcc = $user->mail . ', ' . \Drupal::config('dwsim_flowsheet.settings')->get('dwsim_flowsheet_emails');
-      $cc = \Drupal::config('dwsim_flowsheet.settings')->get('dwsim_flowsheet_cc_emails');
-      $params['dwsim_flowsheet_proposal_approved']['proposal_id'] = $proposal_id;
-      $params['dwsim_flowsheet_proposal_approved']['user_id'] = $proposal_data->uid;
-      $params['dwsim_flowsheet_proposal_approved']['headers'] = [
-        'From' => $from,
-        'MIME-Version' => '1.0',
-        'Content-Type' => 'text/plain; charset=UTF-8; format=flowed; delsp=yes',
-        'Content-Transfer-Encoding' => '8Bit',
-        'X-Mailer' => 'Drupal',
-        'Cc' => $cc,
-        'Bcc' => $bcc,
-      ];
-      $langcode = \Drupal::languageManager()->getCurrentLanguage()->getId();
-      $mail_result = \Drupal::service('plugin.manager.mail')->mail(
+      $email_to = $user_data->getEmail();
+      
+      $this->mailHelper->sendApprovalMail(
         'dwsim_flowsheet',
-        'dwsim_flowsheet_proposal_approved',
-        $email_to,
-        $langcode,
-        $params,
-        $from,
-        TRUE
+        $proposal_id,
+        $proposal_data->uid,
+        $email_to
       );
-      if (empty($mail_result['result'])) {
-        \Drupal::messenger()->addError('Error sending email message.');
-      }
       \Drupal::messenger()->addStatus('DWSIM flowsheeting proposal No. ' . $proposal_id . ' approved. User has been notified of the approval.');
-      // drupal_goto('flowsheeting-project/manage-proposal');
-      $response = new RedirectResponse(Url::fromRoute('dwsim_flowsheet.proposal_pending_0')->toString());
-      // Send the redirect response
-      $response->send();
+      $form_state->setRedirect('dwsim_flowsheet.proposal_pending_0');
       return;
     } //$form_state['values']['approval'] == 1
     else {
@@ -373,40 +359,17 @@ $form['cancel'] = [
         $result = \Drupal::database()->query($query, $args);
         /* sending email */
         $user_data = \Drupal::entityTypeManager()->getStorage('user')->load($proposal_data->uid);
-        $email_to = $user_data->mail;
-        $from = \Drupal::config('dwsim_flowsheet.settings')->get('dwsim_flowsheet_from_email');
-        $bcc = $user->mail . ', ' . \Drupal::config('dwsim_flowsheet.settings')->get('dwsim_flowsheet_emails');
-        $cc = \Drupal::config('dwsim_flowsheet.settings')->get('dwsim_flowsheet_cc_emails');
-        $params['dwsim_flowsheet_proposal_disapproved']['proposal_id'] = $proposal_id;
-        $params['dwsim_flowsheet_proposal_disapproved']['user_id'] = $proposal_data->uid;
-        $params['dwsim_flowsheet_proposal_disapproved']['reason'] = $form_state->getValue(['message']);
-        $params['dwsim_flowsheet_proposal_disapproved']['headers'] = [
-          'From' => $from,
-          'MIME-Version' => '1.0',
-          'Content-Type' => 'text/plain; charset=UTF-8; format=flowed; delsp=yes',
-          'Content-Transfer-Encoding' => '8Bit',
-          'X-Mailer' => 'Drupal',
-          'Cc' => $cc,
-          'Bcc' => $bcc,
-        ];
-        $langcode = \Drupal::languageManager()->getCurrentLanguage()->getId();
-        $mail_result = \Drupal::service('plugin.manager.mail')->mail(
+        $email_to = $user_data->getEmail();
+        
+        $this->mailHelper->sendRejectionMail(
           'dwsim_flowsheet',
-          'dwsim_flowsheet_proposal_disapproved',
+          $proposal_id,
+          $proposal_data->uid,
           $email_to,
-          $langcode,
-          $params,
-          $from,
-          TRUE
+          $form_state->getValue(['message'])
         );
-        if (empty($mail_result['result'])) {
-          \Drupal::messenger()->addError('Error sending email message.');
-        }
         \Drupal::messenger()->addError('DWSIM flowsheeting proposal No. ' . $proposal_id . ' dis-approved. User has been notified of the dis-approval.');
-        // drupal_goto('flowsheeting-project/manage-proposal');
-        $response = new RedirectResponse(Url::fromRoute('dwsim_flowsheet.proposal_pending_0')->toString());
-        // Send the redirect response
-        $response->send();
+        $form_state->setRedirect('dwsim_flowsheet.proposal_pending_0');
         return;
       }
     } //$form_state['values']['approval'] == 2

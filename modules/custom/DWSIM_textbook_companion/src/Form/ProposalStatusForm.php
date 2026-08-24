@@ -9,325 +9,335 @@ namespace Drupal\textbook_companion\Form;
 
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\Element;
+use Drupal\Core\Database\Connection;
+use Drupal\Core\Messenger\MessengerInterface;
+use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\textbook_companion\Services\MailService;
+use Drupal\Core\Link;
+use Drupal\Core\Url;
+use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Drupal\Core\Form\EnforcedResponseException;
 
 class ProposalStatusForm extends FormBase {
 
-  /**
-   * {@inheritdoc}
-   */
+  protected $database;
+  protected $messenger;
+  protected $currentUser;
+  protected $entityTypeManager;
+  protected $mailService;
+
+  public function __construct(
+    Connection $database,
+    MessengerInterface $messenger,
+    AccountProxyInterface $current_user,
+    EntityTypeManagerInterface $entity_type_manager,
+    MailService $mail_service
+  ) {
+    $this->database = $database;
+    $this->messenger = $messenger;
+    $this->currentUser = $current_user;
+    $this->entityTypeManager = $entity_type_manager;
+    $this->mailService = $mail_service;
+  }
+
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('database'),
+      $container->get('messenger'),
+      $container->get('current_user'),
+      $container->get('entity_type.manager'),
+      $container->get('textbook_companion.mail_service')
+    );
+  }
+
   public function getFormId() {
     return 'proposal_status_form';
   }
 
-  public function buildForm(array $from, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
-    /* get current proposal */
-    $proposal_id = arg(3);
-    /*$proposal_q = db_query("SELECT * FROM {textbook_companion_proposal} WHERE id = %d", $proposal_id);*/
-    $query = db_select('textbook_companion_proposal');
-    $query->fields('textbook_companion_proposal');
+  public function buildForm(array $form, FormStateInterface $form_state) {
+    // Extract proposal_id from query parameter.
+    $proposal_id = \Drupal::request()->query->get('proposal_id')
+      ?? \Drupal::routeMatch()->getParameter('proposal_id');
+
+    if (empty($proposal_id)) {
+      $path_parts = explode('/', trim(\Drupal::request()->getPathInfo(), '/'));
+      $last = end($path_parts);
+      if (is_numeric($last)) {
+        $proposal_id = (int) $last;
+      }
+    }
+
+    if (empty($proposal_id)) {
+      $this->messenger->addError($this->t('Invalid proposal selected. Please try again.'));
+      throw new EnforcedResponseException(
+        new RedirectResponse(Url::fromRoute('textbook_companion._proposal_all')->toString())
+      );
+    }
+
+    $query = $this->database->select('textbook_companion_proposal', 'p');
+    $query->fields('p');
     $query->condition('id', $proposal_id);
-    $proposal_q = $query->execute();
-    if (!$proposal_data = $proposal_q->fetchObject()) {
-      drupal_set_message(t('Invalid proposal selected. Please try again.'), 'error');
-      drupal_goto('textbook-companion/manage-proposal');
-      return;
-    } //!$proposal_data = $proposal_q->fetchObject()
+    $proposal_data = $query->execute()->fetchObject();
+
+    if (!$proposal_data) {
+      $this->messenger->addError($this->t('Invalid proposal selected. Please try again.'));
+      throw new EnforcedResponseException(
+        new RedirectResponse(Url::fromRoute('textbook_companion._proposal_all')->toString())
+      );
+    }
+
+    // Load user for email.
+    $proposal_user = $this->entityTypeManager->getStorage('user')->load($proposal_data->uid);
+    $user_email = $proposal_user ? $proposal_user->getEmail() : $this->t('Unknown');
+
     $form['full_name'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->full_name,
-      '#title' => t('Contributor Name'),
+      '#title' => $this->t('Contributor Name'),
     ];
     $form['email'] = [
       '#type' => 'item',
-      '#markup' => user_load($proposal_data->uid)->mail,
-      '#title' => t('Email'),
+      '#markup' => $user_email,
+      '#title' => $this->t('Email'),
     ];
     $form['mobile'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->mobile,
-      '#title' => t('Mobile'),
+      '#title' => $this->t('Mobile'),
     ];
     $form['how_project'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->how_project,
-      '#title' => t('How did you come to know about this project'),
+      '#title' => $this->t('How did you come to know about this project'),
     ];
     $form['course'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->course,
-      '#title' => t('Course'),
+      '#title' => $this->t('Course'),
     ];
     $form['branch'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->branch,
-      '#title' => t('Department/Branch'),
+      '#title' => $this->t('Department/Branch'),
     ];
     $form['university'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->university,
-      '#title' => t('University/Institute'),
+      '#title' => $this->t('University/Institute'),
     ];
     $form['city'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->city,
-      '#title' => t('City/Village'),
+      '#title' => $this->t('City/Village'),
     ];
     $form['pincode'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->pincode,
-      '#title' => t('Pincode'),
+      '#title' => $this->t('Pincode'),
     ];
     $form['state'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->state,
-      '#title' => t('State'),
+      '#title' => $this->t('State'),
     ];
     $form['faculty'] = [
       '#type' => 'hidden',
-      '#markup' => $proposal_data->faculty,
-      '#title' => t('College Teacher/Professor'),
+      '#value' => $proposal_data->faculty,
     ];
     $form['reviewer'] = [
       '#type' => 'hidden',
-      '#markup' => $proposal_data->reviewer,
-      '#title' => t('Reviewer'),
+      '#value' => $proposal_data->reviewer,
     ];
+    $completion_ts = $proposal_data->completion_date;
     $form['completion_date'] = [
       '#type' => 'item',
-      '#markup' => date('d-m-Y', $proposal_data->completion_date),
-      '#title' => t('Expected Date of Completion'),
+      '#markup' => $completion_ts ? date('d-m-Y', $completion_ts) : '-----',
+      '#title' => $this->t('Expected Date of Completion'),
     ];
     $form['operating_system'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->operating_system,
-      '#title' => t('Operating System'),
+      '#title' => $this->t('Operating System'),
     ];
     $form['version'] = [
       '#type' => 'item',
       '#markup' => $proposal_data->dwsim_version,
-      '#title' => t('DWSIM Version'),
+      '#title' => $this->t('DWSIM Version'),
     ];
+
     if ($proposal_data->proposal_type == 1) {
       $form['reason'] = [
-        '#type' => 'hidden',
+        '#type' => 'item',
         '#markup' => $proposal_data->reason,
-        '#title' => t('Reason'),
+        '#title' => $this->t('Reason'),
       ];
       $form['reference'] = [
-        '#type' => 'hidden',
+        '#type' => 'item',
         '#markup' => $proposal_data->reference,
-        '#title' => t('References'),
+        '#title' => $this->t('References'),
       ];
-    } //$proposal_data->proposal_type == 1
-	/* get book preference */
+    }
+
+    // Book preferences list.
     $preference_html = '<ul>';
-    /*$preference_q = db_query("SELECT * FROM {textbook_companion_preference} WHERE proposal_id = %d ORDER BY pref_number ASC", $proposal_id);*/
-    $query = db_select('textbook_companion_preference');
-    $query->fields('textbook_companion_preference');
-    $query->condition('proposal_id', $proposal_id);
-    $query->orderBy('pref_number', 'ASC');
-    $preference_q = $query->execute();
-    while ($preference_data = $preference_q->fetchObject()) {
+    $pref_query = $this->database->select('textbook_companion_preference', 'pref');
+    $pref_query->fields('pref');
+    $pref_query->condition('proposal_id', $proposal_id);
+    $pref_query->orderBy('pref_number', 'ASC');
+    $pref_result = $pref_query->execute();
+    while ($preference_data = $pref_result->fetchObject()) {
       if ($preference_data->approval_status == 1) {
-        $preference_html .= '<li><strong>' . $preference_data->book . ' (Written by ' . $preference_data->author . ')  - Approved Book</strong></li>';
+        $preference_html .= '<li><strong>' . $preference_data->book . ' (Written by ' . $preference_data->author . ') - Approved Book</strong></li>';
       }
       else {
         $preference_html .= '<li>' . $preference_data->book . ' (Written by ' . $preference_data->author . ')</li>';
       }
-    } //$preference_data = $preference_q->fetchObject()
+    }
     $preference_html .= '</ul>';
     $form['book_preference'] = [
       '#type' => 'item',
       '#markup' => $preference_html,
-      '#title' => t('Book Preferences'),
+      '#title' => $this->t('Book Preferences'),
     ];
-    $proposal_status = '';
-    switch ($proposal_data->proposal_status) {
-      case 0:
-        $proposal_status = t('Pending');
-        break;
-      case 1:
-        $proposal_status = t('Approved');
-        break;
-      case 2:
-        $proposal_status = t('Dis-approved');
-        break;
-      case 3:
-        $proposal_status = t('Completed');
-        break;
-      case 4:
-        $proposal_status = t('External');
-        break;
-      case 5:
-        $proposal_status = t('Submitted all codes');
-        break;
-      default:
-        $proposal_status = t('Unkown');
-        break;
-    } //$proposal_data->proposal_status
+
+    // Proposal status label.
+    $statuses = [
+      0 => $this->t('Pending'),
+      1 => $this->t('Approved'),
+      2 => $this->t('Dis-approved'),
+      3 => $this->t('Completed'),
+      4 => $this->t('External'),
+      5 => $this->t('Submitted all codes'),
+    ];
+    $proposal_status = $statuses[$proposal_data->proposal_status] ?? $this->t('Unknown');
     $form['proposal_status'] = [
       '#type' => 'item',
       '#markup' => $proposal_status,
-      '#title' => t('Proposal Status'),
+      '#title' => $this->t('Proposal Status'),
     ];
+
     if ($proposal_data->proposal_status == 2) {
       $form['message'] = [
         '#type' => 'item',
         '#markup' => $proposal_data->message,
-        '#title' => t('Reason for disapproval'),
+        '#title' => $this->t('Reason for disapproval'),
       ];
-    } //$proposal_data->proposal_status == 2
-    $query = db_select('textbook_companion_preference');
-    $query->fields('textbook_companion_preference');
-    $query->condition('proposal_id', $proposal_id);
-    $query->orderBy('pref_number', 'ASC');
-    $preference_q_status = $query->execute()->fetchObject();
-    if ($preference_q_status->submited_all_examples_code == 1) {
-      $form['submit_all_code'] = [
-        '#type' => 'checkbox',
-        '#title' => t('<strong>Enable Code Submission for user</strong>'),
-        '#description' => t('Check if user has not submitted all the book examples.'),
-      ];
-      $form['completed'] = [
-        '#type' => 'hidden',
-        '#value' => 0,
-      ];
-    } //$preference_q_status->submited_all_examples_code == 1
-    else {
-      if ($preference_q_status->submited_all_examples_code == 2) {
-        if (($proposal_data->proposal_status == 1 || $proposal_data->proposal_status == 4) || $proposal_data->proposal_status == 5) {
+    }
+
+    // Re-query first preference for submission status.
+    $pref_status_query = $this->database->select('textbook_companion_preference', 'pref');
+    $pref_status_query->fields('pref');
+    $pref_status_query->condition('proposal_id', $proposal_id);
+    $pref_status_query->orderBy('pref_number', 'ASC');
+    $preference_q_status = $pref_status_query->execute()->fetchObject();
+
+    if ($preference_q_status) {
+      if ($preference_q_status->submited_all_examples_code == 1) {
+        $form['submit_all_code'] = [
+          '#type' => 'checkbox',
+          '#title' => $this->t('<strong>Enable Code Submission for user</strong>'),
+          '#description' => $this->t('Check if user has not submitted all the book examples.'),
+        ];
+        $form['completed'] = ['#type' => 'hidden', '#value' => 0];
+      }
+      elseif ($preference_q_status->submited_all_examples_code == 2) {
+        if (in_array($proposal_data->proposal_status, [1, 4, 5])) {
           $form['completed'] = [
             '#type' => 'checkbox',
-            '#title' => t('<strong>Completed</strong>'),
-            '#description' => t('Check if user has completed all the book examples.'),
+            '#title' => $this->t('<strong>Completed</strong>'),
+            '#description' => $this->t('Check if user has completed all the book examples.'),
           ];
-          $form['submit_all_code'] = [
-            '#type' => 'hidden',
-            '#value' => 0,
-          ];
-        } //($proposal_data->proposal_status == 1 || $proposal_data->proposal_status == 4) || $proposal_data->proposal_status == 5
+          $form['submit_all_code'] = ['#type' => 'hidden', '#value' => 0];
+        }
       }
-    } //$preference_q_status->submited_all_examples_code == 2
+    }
+
     if ($proposal_data->proposal_status == 0) {
+      $approve_url = Url::fromRoute('textbook_companion.proposal_approval_form', [], [
+        'query' => ['proposal_id' => $proposal_id],
+      ]);
       $form['approve'] = [
         '#type' => 'item',
-        '#markup' => l('Click here', 'textbook-companion/manage-proposal/approve/' . $proposal_id),
-        '#title' => t('Approve'),
+        '#markup' => Link::fromTextAndUrl($this->t('Click here'), $approve_url)->toString(),
+        '#title' => $this->t('Approve'),
       ];
-      $form['completed'] = [
-        '#type' => 'hidden',
-        '#value' => 0,
-      ];
-      $form['submit_all_code'] = [
-        '#type' => 'hidden',
-        '#value' => 0,
-      ];
-    } //$proposal_data->proposal_status == 0
-    $form['proposal_id'] = [
-      '#type' => 'hidden',
-      '#value' => $proposal_id,
-    ];
-    $form['submit'] = [
-      '#type' => 'submit',
-      '#value' => t('Submit'),
-    ];
+      $form['completed'] = ['#type' => 'hidden', '#value' => 0];
+      $form['submit_all_code'] = ['#type' => 'hidden', '#value' => 0];
+    }
+
+    $form['proposal_id'] = ['#type' => 'hidden', '#value' => $proposal_id];
+    $form['submit'] = ['#type' => 'submit', '#value' => $this->t('Submit')];
     $form['cancel'] = [
-      '#type' => 'item',
-      '#markup' => l(t('Cancel'), 'textbook-companion/manage-proposal/all'),
+      '#type' => 'link',
+      '#title' => $this->t('Cancel'),
+      '#url' => Url::fromRoute('textbook_companion._proposal_all'),
+      '#attributes' => ['class' => ['button']],
     ];
+
     return $form;
   }
 
-  public function submitForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
-    /* get current proposal */
-    $proposal_id = $form_state->getValue(['proposal_id']);
-    /*$proposal_q = db_query("SELECT * FROM {textbook_companion_proposal} WHERE id = %d", $proposal_id);*/
-    $query = db_select('textbook_companion_proposal');
-    $query->fields('textbook_companion_proposal');
+  public function submitForm(array &$form, FormStateInterface $form_state) {
+    $proposal_id = $form_state->getValue('proposal_id');
+
+    $query = $this->database->select('textbook_companion_proposal', 'p');
+    $query->fields('p');
     $query->condition('id', $proposal_id);
-    $proposal_q = $query->execute();
-    if (!$proposal_data = $proposal_q->fetchObject()) {
-      drupal_set_message(t('Invalid proposal selected. Please try again.'), 'error');
-      drupal_goto('textbook-companion/manage-proposal');
+    $proposal_data = $query->execute()->fetchObject();
+
+    if (!$proposal_data) {
+      $this->messenger->addError($this->t('Invalid proposal selected. Please try again.'));
+      $form_state->setRedirect('textbook_companion._proposal_all');
       return;
-    } //!$proposal_data = $proposal_q->fetchObject()
-    if ($form_state->getValue(['submit_all_code']) == 1) {
-      /*db_query("UPDATE {textbook_companion_proposal} SET proposal_status = 3 WHERE id = %d", $proposal_id);*/
-      $query = db_update('textbook_companion_preference');
-      $query->fields(['submited_all_examples_code' => 0]);
-      $query->condition('proposal_id', $proposal_id);
-      $num_updated = $query->execute();
-      /* sending email */
-      $book_user = user_load($proposal_data->uid);
-      $email_to = $book_user->mail;
-      $from = variable_get('textbook_companion_from_email', '');
-      $bcc = variable_get('textbook_companion_bcc_emails', '');
-      $cc = variable_get('textbook_companion_cc_emails', '');
-      $book_user = user_load($proposal_data->uid);
-      $params['all_code_submitted_status_changed']['proposal_id'] = $proposal_id;
-      $params['all_code_submitted_status_changed']['user_id'] = $proposal_data->uid;
-      $params['all_code_submitted_status_changed']['headers'] = [
-        'From' => $from,
-        'MIME-Version' => '1.0',
-        'Content-Type' => 'text/plain; charset=UTF-8; format=flowed; delsp=yes',
-        'Content-Transfer-Encoding' => '8Bit',
-        'X-Mailer' => 'Drupal',
-        'Cc' => $cc,
-        'Bcc' => $bcc,
-      ];
-      if (!drupal_mail('textbook_companion', 'all_code_submitted_status_changed', $email_to, language_default(), $params, $from, TRUE)) {
-        drupal_set_message('Error sending email message.', 'error');
-      }
-      drupal_set_message('User has been notified of that code submission interface is now available .', 'status');
-      drupal_goto('textbook-companion/manage-proposal');
-      return;
-    } //$form_state['values']['submit_all_code'] == 1
-    else {
-      if ($form_state->getValue(['completed']) == 1) {
-        /* set the book status to completed */
-        /*db_query("UPDATE {textbook_companion_proposal} SET proposal_status = 3 WHERE id = %d", $proposal_id);*/
-        $query = db_update('textbook_companion_proposal');
-        $query->fields([
-          'proposal_status' => 3,
-          'completion_date' => time(),
-        ]);
-        $query->condition('id', $proposal_id);
-        $num_updated = $query->execute();
-        CreateReadmeFileTextbookCompanion($proposal_id);
-        /* sending email */
-        $book_user = user_load($proposal_data->uid);
-        $email_to = $book_user->mail;
-        $from = variable_get('textbook_companion_from_email', '');
-        $bcc = variable_get('textbook_companion_emails', '');
-        $cc = variable_get('textbook_companion_cc_emails', '');
-        $param['proposal_completed']['proposal_id'] = $proposal_id;
-        $param['proposal_completed']['user_id'] = $proposal_data->uid;
-        $param['proposal_completed']['headers'] = [
-          'From' => $from,
-          'MIME-Version' => '1.0',
-          'Content-Type' => 'text/plain; charset=UTF-8; format=flowed; delsp=yes',
-          'Content-Transfer-Encoding' => '8Bit',
-          'X-Mailer' => 'Drupal',
-          'Cc' => $cc,
-          'Bcc' => $bcc,
-        ];
-        if (!drupal_mail('textbook_companion', 'proposal_completed', $email_to, language_default(), $params, $from, TRUE)) {
-          drupal_set_message('Error sending email message.', 'error');
-        }
-        drupal_set_message('Congratulations! Book proposal has been marked as completed. User has been notified of the completion.', 'status');
-      } //$form_state['values']['completed'] == 1
-      else {
-        drupal_set_message('Please select any one action.', 'error');
-        drupal_goto('textbook-companion/manage-proposal/status/' . $proposal_id);
-        return;
-      }
     }
-    drupal_goto('textbook-companion/manage-proposal');
-    return;
+
+    $proposal_user = $this->entityTypeManager->getStorage('user')->load($proposal_data->uid);
+
+    if ($form_state->getValue('submit_all_code') == 1) {
+      $this->database->update('textbook_companion_preference')
+        ->fields(['submited_all_examples_code' => 0])
+        ->condition('proposal_id', $proposal_id)
+        ->execute();
+
+      if ($proposal_user) {
+        $params['all_code_submitted_status_changed']['proposal_id'] = $proposal_id;
+        $params['all_code_submitted_status_changed']['user_id'] = $proposal_data->uid;
+        if (!$this->mailService->sendMail('textbook_companion', 'all_code_submitted_status_changed', $proposal_user->getEmail(), $params)) {
+          $this->messenger->addError($this->t('Error sending email message.'));
+        }
+      }
+      $this->messenger->addStatus($this->t('User has been notified that code submission interface is now available.'));
+    }
+    elseif ($form_state->getValue('completed') == 1) {
+      $this->database->update('textbook_companion_proposal')
+        ->fields(['proposal_status' => 3, 'completion_date' => time()])
+        ->condition('id', $proposal_id)
+        ->execute();
+
+      if (function_exists('CreateReadmeFileTextbookCompanion')) {
+        CreateReadmeFileTextbookCompanion($proposal_id);
+      }
+
+      if ($proposal_user) {
+        $params['proposal_completed']['proposal_id'] = $proposal_id;
+        $params['proposal_completed']['user_id'] = $proposal_data->uid;
+        if (!$this->mailService->sendMail('textbook_companion', 'proposal_completed', $proposal_user->getEmail(), $params)) {
+          $this->messenger->addError($this->t('Error sending email message.'));
+        }
+      }
+      $this->messenger->addStatus($this->t('Congratulations! Book proposal has been marked as completed. User has been notified of the completion.'));
+    }
+    else {
+      $this->messenger->addError($this->t('Please select any one action.'));
+      $form_state->setRedirect('textbook_companion.proposal_status_form', [], [
+        'query' => ['proposal_id' => $proposal_id],
+      ]);
+      return;
+    }
+
+    $form_state->setRedirect('textbook_companion._proposal_all');
   }
 
 }
-?>

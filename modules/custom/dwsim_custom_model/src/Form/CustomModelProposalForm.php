@@ -12,19 +12,41 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
 use Drupal\Core\Link;
 use Drupal\Core\Url;
-use Drupal\Core\Routing\TrustedRedirectResponse;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Drupal\Core\Routing\RouteMatchInterface;
-use Drupal\Core\StringTranslation\StringTranslationTrait;
-use Drupal\Core\Database\Database;
+use Drupal\Core\Database\Connection;
 use Drupal\Core\Messenger\MessengerInterface;
-use Drupal\Core\Mail\MailManager;
-use Drupal\user\Entity\User;
-use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 class CustomModelProposalForm extends FormBase {
+
+  protected $connection;
+  protected $messenger;
+  protected $currentUser;
+  protected $configFactory;
+
+  public function __construct(
+    Connection $connection,
+    MessengerInterface $messenger,
+    AccountInterface $currentUser,
+    ConfigFactoryInterface $configFactory
+  ) {
+    $this->connection    = $connection;
+    $this->messenger     = $messenger;
+    $this->currentUser   = $currentUser;
+    $this->configFactory = $configFactory;
+  }
+
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('database'),
+      $container->get('messenger'),
+      $container->get('current_user'),
+      $container->get('config.factory')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -34,34 +56,25 @@ class CustomModelProposalForm extends FormBase {
   }
 
   public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
-    $user = \Drupal\user\Entity\User::load(\Drupal::currentUser()->id());
-    /************************ start approve book details ************************/
+    $user = $this->currentUser;
     if ($user->isAnonymous()) {
-      // $msg = \Drupal::messenger()->addError(t('This is an error message, red in color'));
-      $url = Link::fromTextAndUrl(t('login'), Url::fromRoute('user.page'))->toString();
-      $msg = \Drupal::messenger()->addmessage(t('It is mandatory to ' . Link::fromTextAndUrl(t('login'), Url::fromRoute('user.page'))->toString() . ' on this website to access the lab proposal form. If you are new user please create a new account first.'));
-      // return $msg;
-
-      $response = new RedirectResponse(Url::fromRoute('user.page')->toString());
-
-  $response->send();
-  return $msg;
-    } //$user->uid == 0
-    $query = \Drupal::database()->select('custom_model_proposal');
-    $query->fields('custom_model_proposal');
-    $query->condition('uid', $user->id());
-    $query->orderBy('id', 'DESC');
-    $query->range(0, 1);
-    $proposal_q = $query->execute();
-    $proposal_data = $proposal_q->fetchObject();
+      $this->messenger->addError($this->t('Please login to access the proposal form.'));
+      $form_state->setRedirectUrl(Url::fromRoute('user.page'));
+      return [];
+    }
+    $proposal_data = $this->connection->select('custom_model_proposal')
+      ->fields('custom_model_proposal')
+      ->condition('uid', $user->id())
+      ->orderBy('id', 'DESC')
+      ->range(0, 1)
+      ->execute()
+      ->fetchObject();
     if ($proposal_data) {
       if ($proposal_data->approval_status == 0 || $proposal_data->approval_status == 1) {
-        \Drupal::messenger()->addMessage(t('We have already received your proposal.'), 'status');
-        // drupal_goto('');
-        return;
-      } //$proposal_data->approval_status == 0 || $proposal_data->approval_status == 1
-    } //$proposal_data
+        $this->messenger->addStatus($this->t('We have already received your proposal.'));
+        return [];
+      }
+    }
     $form['#attributes'] = [
       'enctype' => "multipart/form-data"
       ];
@@ -268,8 +281,8 @@ class CustomModelProposalForm extends FormBase {
       '#type' => 'file',
       //'#title' => t('Upload circuit diagram'),
 		'#size' => 48,
-      '#description' => $this->t('Upload a document of about 1-2 pages explaining 
-      the custom model you intend to create') . '<br />' . $this->t('<span style="color:red;">Allowed file extensions : ') . \Drupal::config('custom_model.settings')->get('resource_upload_extensions', '') . '</span>',
+      '#description' => $this->t('Upload a document of about 1-2 pages explaining
+      the custom model you intend to create') . '<br />' . $this->t('<span style="color:red;">Allowed file extensions : ') . $this->configFactory->get('custom_model.settings')->get('resource_upload_extensions', '') . '</span>',
      
 
     ];
@@ -407,7 +420,7 @@ class CustomModelProposalForm extends FormBase {
         $allowed_extensions_str = '';
         switch ($file_type) {
           case 'S':
-            $allowed_extensions_str = \Drupal::config('custom_model.settings')->get('lab_migration_syllabus_file_extensions');
+            $allowed_extensions_str = $this->configFactory->get('custom_model.settings')->get('lab_migration_syllabus_file_extensions');
             break;
         } //$file_type
         $allowed_extensions = explode(',', $allowed_extensions_str);
@@ -427,19 +440,10 @@ class CustomModelProposalForm extends FormBase {
   }
 
   public function submitForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
-
-    if (!$user->id()) {
-      \Drupal::messenger()->addmessage('It is mandatory to login on this website to access the proposal form');
+    if (!$this->currentUser->id()) {
+      $this->messenger->addError($this->t('It is mandatory to login on this website to access the proposal form.'));
       return;
     }
-
-  
-	/*if ($form_state['values']['version'] == 'Old version')
-	{
-		$form_state['values']['version'] = trim($form_state['values']['older']);
-	} *///$form_state['values']['version'] == 'Old version'
-	/* inserting the user proposal */
     if ($form_state->getValue(['department']) == 'Others') {
       $form_state->setValue(['department'], $form_state->getValue(['other_department']));
     }
@@ -507,7 +511,7 @@ class CustomModelProposalForm extends FormBase {
     )";
     $args = [
       // 'uid' =>  $user->get('uid')->value,
-      'uid' => \Drupal::currentUser()->id(), 
+      'uid' => $this->currentUser->id(),
 
       'approver_uid' => 0,
       'name_title' => $v['name_title'],
@@ -534,11 +538,7 @@ class CustomModelProposalForm extends FormBase {
     //var_dump($result);die;
     // var_dump($root_path);die;	
 
-    $result1 = \Drupal::database()->query($result, $args, [
-      'return' => Database::RETURN_INSERT_ID
-      ]);
-    //var_dump($args);die;
-
+    $result1 = $this->connection->query($result, $args);
     $root_path = \Drupal::service('custom_model_global')->custom_model_path();
     $dest_path = $directory_name . '/';
     $dest_path1 = $root_path . $dest_path;
@@ -552,9 +552,9 @@ class CustomModelProposalForm extends FormBase {
         /* checking file type */
         //$file_type = 'S';
         if (file_exists($root_path . $dest_path . $_FILES['files']['name'][$file_form_name])) {
-          \Drupal::messenger()->addMessage(t("Error uploading file. File !filename already exists.", [
-            '!filename' => $_FILES['files']['name'][$file_form_name]
-            ]), 'error');
+          $this->messenger->addError($this->t('Error uploading file. File @filename already exists.', [
+            '@filename' => $_FILES['files']['name'][$file_form_name],
+          ]));
           //unlink($root_path . $dest_path . $_FILES['files']['name'][$file_form_name]);
         } //file_exists($root_path . $dest_path . $_FILES['files']['name'][$file_form_name])
 			/* uploading file */
@@ -565,20 +565,18 @@ class CustomModelProposalForm extends FormBase {
             ":id" => $result1,
           ];
 
-          $updateresult = \Drupal::database()->query($query, $args);
-          //var_dump($args);die;
-
-          \Drupal::messenger()->addMessage($file_name . ' uploaded successfully.', 'status');
+          $updateresult = $this->connection->query($query, $args);
+          $this->messenger->addStatus($file_name . ' uploaded successfully.');
         } //move_uploaded_file($_FILES['files']['tmp_name'][$file_form_name], $root_path . $dest_path . $_FILES['files']['name'][$file_form_name])
         else {
-          \Drupal::messenger()->addMessage('Error uploading file : ' . $dest_path . '/' . $file_name, 'error');
+          $this->messenger->addError($this->t('Error uploading file: @path', ['@path' => $dest_path . '/' . $file_name]));
         }
       } //$file_name
     } //$_FILES['files']['name'] as $file_form_name => $file_name
     if (!$result1) {
-      \Drupal::messenger()->addMessage(t('Error receiving your proposal. Please try again.'), 'error');
+      $this->messenger->addError($this->t('Error receiving your proposal. Please try again.'));
       return;
-    } 
+    }
     //!$proposal_id
 	/* sending email */
     // $email_to = $user->mail;
@@ -599,12 +597,8 @@ class CustomModelProposalForm extends FormBase {
     // if (!drupal_mail('custom_model', 'custom_model_proposal_received', $email_to, user_preferred_language($user), $params, $form, TRUE)) {
     //   \Drupal::messenger()->addMessage('Error sending email message.', 'error');
     // }
-    \Drupal::messenger()->addMessage(t('We have received your DWSIM Custom Model proposal. We will get back to you soon.'), 'status');
-    // drupal_goto('');
-    $response = new RedirectResponse(Url::fromRoute('<front>')->toString());
-  
-    // Send the redirect response
-      $response->send();
+    $this->messenger->addStatus($this->t('We have received your DWSIM Custom Model proposal. We will get back to you soon.'));
+    $form_state->setRedirectUrl(Url::fromRoute('<front>'));
   }
 
 }

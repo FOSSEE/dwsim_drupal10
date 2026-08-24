@@ -17,7 +17,35 @@ use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\HtmlCommand;
 use Drupal\user\Entity\User;
 
+use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\dwsim_flowsheet\Services\AjaxHelper;
+
 class DwsimFlowsheetRunForm extends FormBase {
+
+  /**
+   * The ajax response helper service.
+   *
+   * @var \Drupal\dwsim_flowsheet\Services\AjaxHelper
+   */
+  protected $ajaxHelper;
+
+  /**
+   * Constructs a DwsimFlowsheetRunForm object.
+   *
+   * @param \Drupal\dwsim_flowsheet\Services\AjaxHelper $ajax_helper
+   */
+  public function __construct(AjaxHelper $ajax_helper) {
+    $this->ajaxHelper = $ajax_helper;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('dwsim_flowsheet.ajax_helper')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -100,13 +128,10 @@ $form['selected_flowsheet'] = [
   
   function dwsim_flowsheet_project_details_callback($form, &$form_state)
   {
-      $response = new AjaxResponse();
       $flowsheet_default_value = $form_state->getValue('flowsheet');
   
       if ($flowsheet_default_value != 0) {
           $flowsheet_details_markup = $this->_flowsheet_details($flowsheet_default_value);
-          $response->addCommand(new HtmlCommand('#ajax_flowsheet_details', $flowsheet_details_markup));
-  
           $flowsheet_details = $this->_flowsheet_information($flowsheet_default_value);
   
           if ($flowsheet_details && $flowsheet_details->uid > 0) {
@@ -126,18 +151,25 @@ $form['selected_flowsheet'] = [
                   ])
               )->toString();
   
-              $response->addCommand(new HtmlCommand('#ajax_selected_flowsheet', $abstract_link . '<br>' . $flowsheet_link));
+              return $this->ajaxHelper->buildMultiCommandResponse([
+                  '#ajax_flowsheet_details' => ['type' => 'html', 'content' => $flowsheet_details_markup],
+                  '#ajax_selected_flowsheet' => ['type' => 'html', 'content' => $abstract_link . '<br>' . $flowsheet_link],
+                  '#ajax_selected_flowsheet_dwsim' => ['type' => 'html', 'content' => ''],
+              ]);
           } else {
-              $response->addCommand(new HtmlCommand('#ajax_selected_flowsheet', ''));
-              $response->addCommand(new HtmlCommand('#ajax_selected_flowsheet_dwsim', ''));
+              return $this->ajaxHelper->buildMultiCommandResponse([
+                  '#ajax_flowsheet_details' => ['type' => 'html', 'content' => $flowsheet_details_markup],
+                  '#ajax_selected_flowsheet' => ['type' => 'html', 'content' => ''],
+                  '#ajax_selected_flowsheet_dwsim' => ['type' => 'html', 'content' => ''],
+              ]);
           }
       } else {
-          $response->addCommand(new HtmlCommand('#ajax_flowsheet_details', ''));
-          $response->addCommand(new HtmlCommand('#ajax_selected_flowsheet', ''));
-          $response->addCommand(new HtmlCommand('#ajax_selected_flowsheet_dwsim', ''));
+          return $this->ajaxHelper->buildMultiCommandResponse([
+              '#ajax_flowsheet_details' => ['type' => 'html', 'content' => ''],
+              '#ajax_selected_flowsheet' => ['type' => 'html', 'content' => ''],
+              '#ajax_selected_flowsheet_dwsim' => ['type' => 'html', 'content' => ''],
+          ]);
       }
-  
-      return $response;
   }
   
   function bootstrap_table_format($headers, $rows)

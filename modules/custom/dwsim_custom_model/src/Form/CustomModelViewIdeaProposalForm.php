@@ -9,20 +9,42 @@ namespace Drupal\custom_model\Form;
 
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\Element;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Drupal\Core\Url;
 use Drupal\Core\Link;
-use Drupal\user\Entity\User;
-use Symfony\Component\HttpFoundation\Response;
+use Drupal\Core\Database\Connection;
+use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
-use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Mail\MailManagerInterface;
-use Drupal\Core\DependencyInjection\ContainerInterface;
-use Drupal\Core\Session\AccountProxy;
-
+use Drupal\Core\Session\AccountInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 class CustomModelViewIdeaProposalForm extends FormBase {
+
+  protected $connection;
+  protected $messenger;
+  protected $currentUser;
+  protected $routeMatch;
+
+  public function __construct(
+    Connection $connection,
+    MessengerInterface $messenger,
+    AccountInterface $currentUser,
+    RouteMatchInterface $routeMatch
+  ) {
+    $this->connection  = $connection;
+    $this->messenger   = $messenger;
+    $this->currentUser = $currentUser;
+    $this->routeMatch  = $routeMatch;
+  }
+
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('database'),
+      $container->get('messenger'),
+      $container->get('current_user'),
+      $container->get('current_route_match')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -32,36 +54,16 @@ class CustomModelViewIdeaProposalForm extends FormBase {
   }
 
   public function buildForm(array $form, FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
-    /* get current proposal */
-    // $proposal_id = (int) arg(3);
-    $route_match = \Drupal::routeMatch();
-
-    $proposal_id = (int) $route_match->getParameter('id');
-    $query = \Drupal::database()->select('custom_model_idea_proposal');
-    $query->fields('custom_model_idea_proposal');
-    $query->condition('id', $proposal_id);
-    $proposal_q = $query->execute();
-    if ($proposal_q) {
-      if ($proposal_data = $proposal_q->fetchObject()) {
-        /* everything ok */
-      } //$proposal_data = $proposal_q->fetchObject()
-      else {
-        \Drupal::messenger()->addMessage(t('Invalid proposal selected. Please try again.'), 'error');
-        // drupal_goto('custom-model/manage-proposal');
-        
-
-        $response = new RedirectResponse('/custom-model/manage-proposal/view-ideas/');
-$response->send();
-        return;
-      }
-    } //$proposal_q
-    else {
-      \Drupal::messenger()->addMessage(t('Invalid proposal selected. Please try again.'), 'error');
-      // drupal_goto('custom-model/manage-proposal');
-      $response = new RedirectResponse('/custom-model/manage-proposal/view-ideas/');
-      $response->send();
-      return;
+    $proposal_id = (int) $this->routeMatch->getParameter('id');
+    $proposal_data = $this->connection->select('custom_model_idea_proposal')
+      ->fields('custom_model_idea_proposal')
+      ->condition('id', $proposal_id)
+      ->execute()
+      ->fetchObject();
+    if (!$proposal_data) {
+      $this->messenger->addError($this->t('Invalid proposal selected. Please try again.'));
+      $form_state->setRedirectUrl(Url::fromUri('internal:/custom-model/manage-proposal/view-ideas/'));
+      return [];
     }
     if ($proposal_data->reference_link) {
       $reference_link = $proposal_data->reference_link;

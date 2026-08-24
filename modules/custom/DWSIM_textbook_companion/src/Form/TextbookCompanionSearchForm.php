@@ -9,114 +9,118 @@ namespace Drupal\textbook_companion\Form;
 
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\Element;
+use Drupal\Core\Database\Connection;
+use Drupal\Core\Link;
+use Drupal\Core\Url;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 class TextbookCompanionSearchForm extends FormBase {
 
-  /**
-   * {@inheritdoc}
-   */
+  protected $database;
+
+  public function __construct(Connection $database) {
+    $this->database = $database;
+  }
+
+  public static function create(ContainerInterface $container) {
+    return new static($container->get('database'));
+  }
+
   public function getFormId() {
     return 'textbook_companion_search_form';
   }
 
-  public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $form['#redirect'] = FALSE;
+  public function buildForm(array $form, FormStateInterface $form_state) {
+    $request = \Drupal::request();
+    $search_term = $request->query->get('search') ?? '';
+    $by_title = $request->query->get('by_title') ?? 1;
+    $by_author = $request->query->get('by_author') ?? 1;
+
     $form['search'] = [
       '#type' => 'textfield',
-      '#title' => t('Search'),
+      '#title' => $this->t('Search'),
       '#size' => 48,
+      '#default_value' => $search_term,
     ];
     $form['search_by_title'] = [
       '#type' => 'checkbox',
-      '#default_value' => TRUE,
-      '#title' => t('Search by Title of the Book'),
+      '#default_value' => $by_title,
+      '#title' => $this->t('Search by Title of the Book'),
     ];
     $form['search_by_author'] = [
       '#type' => 'checkbox',
-      '#default_value' => TRUE,
-      '#title' => t('Search by Author of the Book'),
+      '#default_value' => $by_author,
+      '#title' => $this->t('Search by Author of the Book'),
     ];
-    $form['submit'] = [
-      '#type' => 'submit',
-      '#value' => t('Search'),
-    ];
+    $form['submit'] = ['#type' => 'submit', '#value' => $this->t('Search')];
     $form['cancel'] = [
-      '#type' => 'item',
-      '#markup' => l(t('Cancel'), ''),
+      '#type' => 'link',
+      '#title' => $this->t('Cancel'),
+      '#url' => Url::fromRoute('<front>'),
+      '#attributes' => ['class' => ['button']],
     ];
-    if ($_POST) {
-      $output = '';
-      $search_rows = [];
-      $search_query = '';
-      if ($_POST['search_by_title'] && $_POST['search_by_author']) {
-        /*$search_q = db_query("SELECT * FROM {textbook_companion_preference} WHERE approval_status = 1 AND (book LIKE '%%%s%%' OR author LIKE '%%%s%%')", $_POST['search'], $_POST['search']);*/
-        $query = db_select('textbook_companion_preference');
-        $query->fields('textbook_companion_preference');
-        $query->condition('approval_status', 1);
-        $or = db_or();
-        $or->condition('book', '%%' . $_POST['search'] . '%%', 'LIKE');
-        $or->condition('author', '%%' . $_POST['search'] . '%%', 'LIKE');
+
+    if (!empty($search_term)) {
+      $query = $this->database->select('textbook_companion_preference', 'pref');
+      $query->fields('pref', ['id', 'book', 'author']);
+      $query->condition('approval_status', 1);
+
+      if ($by_title && $by_author) {
+        $or = $query->orConditionGroup()
+          ->condition('book', '%' . $this->database->escapeLike($search_term) . '%', 'LIKE')
+          ->condition('author', '%' . $this->database->escapeLike($search_term) . '%', 'LIKE');
         $query->condition($or);
-        $search_q = $query->execute();
+      }
+      elseif ($by_title) {
+        $query->condition('book', '%' . $this->database->escapeLike($search_term) . '%', 'LIKE');
+      }
+      elseif ($by_author) {
+        $query->condition('author', '%' . $this->database->escapeLike($search_term) . '%', 'LIKE');
       }
       else {
-        if ($_POST['search_by_title']) {
-          /*$search_q = db_query("SELECT * FROM {textbook_companion_preference} WHERE approval_status = 1 AND book LIKE '%%%s%%'", $_POST['search']);*/
-          $query = db_select('textbook_companion_preference');
-          $query->fields('textbook_companion_preference');
-          $query->condition('approval_status', 1);
-          $query->condition('book', '%%' . $_POST['search'] . '%%', 'LIKE');
-          $search_q = $query->execute();
-        }
-        else {
-          if ($_POST['search_by_author']) {
-            /*$search_q = db_query("SELECT * FROM {textbook_companion_preference} WHERE approval_status = 1 AND author LIKE '%%%s%%'", $_POST['search']);*/
-            $query = db_select('textbook_companion_preference');
-            $query->fields('textbook_companion_preference');
-            $query->condition('approval_status', 1);
-            $query->condition('author', '%%' . $_POST['search'] . '%%', 'LIKE');
-            $search_q = $query->execute();
-          }
-          else {
-            drupal_set_message('Please select whether to search by Title and/or Author of the Book.', 'error');
-          }
-        }
+        $this->messenger()->addError($this->t('Please select whether to search by Title and/or Author.'));
       }
-      while ($search_data = $search_q->fetchObject()) {
+
+      $search_rows = [];
+      foreach ($query->execute() as $search_data) {
+        $run_url = Url::fromRoute('textbook_companion.run_form', ['book_pref_id' => $search_data->id]);
         $search_rows[] = [
-          l($search_data->book, 'textbook_run/' . $search_data->id),
+          Link::fromTextAndUrl($search_data->book, $run_url)->toString(),
           $search_data->author,
         ];
       }
+
       if ($search_rows) {
-        $search_header = [
-          'Title of the Book',
-          'Author Name',
-        ];
-        $output .= theme('table', [
-          'headers' => $search_header,
-          'rows' => $search_rows,
-        ]);
         $form['search_results'] = [
           '#type' => 'item',
-          '#title' => t('Search results for "') . $_POST['search'] . '"',
-          '#markup' => $output,
+          '#title' => $this->t('Search results for "@term"', ['@term' => $search_term]),
+          'table' => [
+            '#type' => 'table',
+            '#header' => [$this->t('Title of the Book'), $this->t('Author Name')],
+            '#rows' => $search_rows,
+          ],
         ];
       }
       else {
         $form['search_results'] = [
           '#type' => 'item',
-          '#title' => t('Search results for "') . $_POST['search'] . '"',
-          '#markup' => 'No results found',
+          '#title' => $this->t('Search results for "@term"', ['@term' => $search_term]),
+          '#markup' => $this->t('No results found'),
         ];
       }
     }
+
     return $form;
   }
 
-    public function submitForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
+  public function submitForm(array &$form, FormStateInterface $form_state) {
+    $form_state->setRedirect('textbook_companion.search_form', [], [
+      'query' => [
+        'search'    => $form_state->getValue('search'),
+        'by_title'  => $form_state->getValue('search_by_title') ? 1 : 0,
+        'by_author' => $form_state->getValue('search_by_author') ? 1 : 0,
+      ],
+    ]);
+  }
 
 }
-}
-?>

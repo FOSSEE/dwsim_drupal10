@@ -1,35 +1,72 @@
-<?php /**
+<?php
+
+/**
  * @file
  * Contains \Drupal\lab_migration\Controller\DefaultController.
  */
 
 namespace Drupal\lab_migration\Controller;
 
-use Drupal\Core\Form\FormBase;
-use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Controller\ControllerBase;
+use Drupal\Core\Database\Connection;
 use Drupal\Core\Link;
-use Drupal\Core\Url;
-use Symfony\Component\HttpFoundation\Response;
-use Drupal\Core\Routing\RouteMatchInterface;
-use Drupal\Core\Database\Database;
-use Symfony\Component\HttpFoundation\RedirectResponse;
-use Drupal\Core\File\FileSystemInterface;
-use Drupal\Service;
-use Drupal\user\Entity\User;
-use Drupal\Core\Session\AccountInterface;
-use Drupal\Core\Form\FormBuilderInterface;
+use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Render\Markup;
+use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\Core\Url;
+use Drupal\lab_migration\Services\LabMigrationGlobalfunction;
+use Drupal\user\Entity\User;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use ZipArchive;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
-
+use Drupal\Core\Routing\RouteMatchInterface;
+use ZipArchive;
 
 /**
  * Default controller for the lab_migration module.
  */
 class DefaultController extends ControllerBase {
+
+  /** @var \Drupal\Core\Database\Connection */
+  protected $database;
+
+  /** @var \Drupal\lab_migration\Services\LabMigrationGlobalfunction */
+  protected $labGlobal;
+
+  /** @var \Drupal\Core\Messenger\MessengerInterface */
+  protected $messenger;
+
+  /** @var \Drupal\Core\Session\AccountProxyInterface */
+  protected $currentUser;
+
+  /**
+   * Constructs a DefaultController instance.
+   */
+  public function __construct(
+    Connection $database,
+    LabMigrationGlobalfunction $lab_global,
+    MessengerInterface $messenger,
+    AccountProxyInterface $current_user
+  ) {
+    $this->database    = $database;
+    $this->labGlobal   = $lab_global;
+    $this->messenger   = $messenger;
+    $this->currentUser = $current_user;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('database'),
+      $container->get('lab_migration_global'),
+      $container->get('messenger'),
+      $container->get('current_user')
+    );
+  }
    
  
   
@@ -195,63 +232,40 @@ class DefaultController extends ControllerBase {
     return $output;
   }
 
-  public function lab_migration_proposal(){
-    /* get pending proposals to be approved */
-    $proposal_rows = '[]';
-    //$proposal_q = \Drupal::database()->query("SELECT * FROM {lab_migration_proposal} ORDER BY id DESC");
-    $query = \Drupal::database()->select('lab_migration_proposal');
-    $query->fields('lab_migration_proposal');
-    $query->orderBy('id', 'DESC');
-    $proposal_q = $query->execute();
-    while ($proposal_data = $proposal_q->fetchObject()) {
-      $approval_status = '';
-      switch ($proposal_data->approval_status) {
-        case 0:
-          $approval_status = 'Pending';
-          break;
-        case 1:
-          $approval_status = "<span style='color:red;'>Approved</span>";
-          break;
-        case 2:
-          $approval_status = "<span style='color:black;'>Dis-approved</span>";
-          break;
-        case 3:
-          $approval_status = "<span style='color:green;'>Solved</span>";
-          break;
-        default:
-          $approval_status = 'Unknown';
-          break;
-        
-      
-    
-      }
+  public function lab_migration_proposal() {
+    $proposal_rows = [];
+    $result = $this->database->select('lab_migration_proposal', 'p')
+      ->fields('p')
+      ->orderBy('id', 'DESC')
+      ->execute();
+
+    $status_map = [
+      0 => 'Pending',
+      1 => 'Approved',
+      2 => 'Dis-approved',
+      3 => 'Solved',
+    ];
+
+    foreach ($result as $row) {
+      $approval_status = $status_map[$row->approval_status] ?? 'Unknown';
+      $status_link = Link::fromTextAndUrl('Status', Url::fromRoute('lab_migration.proposal_status_form', ['id' => $row->id]))->toString();
+      $edit_link   = Link::fromTextAndUrl('Edit', Url::fromRoute('lab_migration.proposal_edit_form', ['id' => $row->id]))->toString();
       $proposal_rows[] = [
-        date('d-m-Y', $proposal_data->creation_date),
-        Link::fromTextAndUrl($proposal_data->name, 'user/' . $proposal_data->uid),
-        $proposal_data->lab_title,
-        $proposal_data->department,
+        date('d-m-Y', $row->creation_date),
+        Link::fromTextAndUrl($row->name, Url::fromRoute('entity.user.canonical', ['user' => $row->uid])),
+        $row->lab_title,
+        $row->department,
         $approval_status,
-        Link::fromTextAndUrl('Status', 'lab-migration/manage-proposal/status/' . $proposal_data->id) . ' | ' . Link::fromTextAndUrl('Edit', 'lab-migration/manage-proposal/edit/' . $proposal_data->id),
+        Markup::create($status_link . ' | ' . $edit_link),
       ];
     }
-    /* check if there are any pending proposals */
-    // if (!$proposal_rows) {
-    //   \Drupal::messenger()->addMessage(t('There are no proposals.'), 'status');
-    //   return '';
-    // }
-    $proposal_header = [
-      'Date of Proposal Submission',
-      'Name',
-      'Title of the Lab',
-      'Department',
-      'Status',
-      'Action',
+
+    return [
+      '#type'   => 'table',
+      '#header' => ['Date', 'Name', 'Title of the Lab', 'Department', 'Status', 'Action'],
+      '#rows'   => $proposal_rows,
+      '#empty'  => $this->t('No proposals found.'),
     ];
-    $output = \Drupal::service("renderer")->render('table', [
-      'header' => $proposal_header,
-      'rows' => $proposal_rows,
-    ]);
-    return $output;
   }
   public function lab_migration_proposal_open() {
     $user = \Drupal::currentUser();
@@ -381,9 +395,10 @@ $link = Link::fromTextAndUrl(t('Edit'), $url)->toString();
   }
 
 
-  function lab_migration_proposal_approval_form($form, $form_state)
-  {
-    global $user;
+  // lab_migration_proposal_approval_form() removed — handled by
+  // \Drupal\lab_migration\Form\LabMigrationProposalApprovalForm via routing.
+
+  public function _placeholder_removed_approval_form() {
     /* get current proposal */
     
     $route_match = \Drupal::routeMatch();
@@ -569,11 +584,7 @@ $link = Link::fromTextAndUrl(t('Edit'), $url)->toString();
         '#type' => 'submit',
         '#value' => t('Submit')
     );
-    $form['cancel'] = array(
-        '#type' => 'item',
-        '#markup' => Link::fromTextAndurl(t('Cancel'), 'lab-migration/manage-proposal')
-    );
-    return $form;
+    // Handled by LabMigrationProposalApprovalForm.
   }
 
   public function lab_migration_proposal_all()
@@ -1113,28 +1124,18 @@ $root_path = \Drupal::service("lab_migration_global")->lab_migration_path();
     //var_dump($zip_file_count);die;
     $zip->close();
     if ($zip_file_count > 0) {
-      /* download zip file */
-      header('Content-Type: application/zip');
-      header('Content-disposition: attachment; filename="EXP' . $experiment_data->number . '.zip"');
-      header('Content-Length: ' . filesize($zip_filename));
-      ob_clean();
-      //flush();
-      readfile($zip_filename);
-      unlink($zip_filename);
+      $response = new BinaryFileResponse($zip_filename);
+      $response->setContentDisposition(
+        ResponseHeaderBag::DISPOSITION_ATTACHMENT,
+        'EXP' . $experiment_data->number . '.zip'
+      );
+      $response->deleteFileAfterSend(TRUE);
+      return $response;
     }
-    else {
-      // \Drupal::messenger()->addMessage("There are no solutions in this experiment to download", 'error');
-      // return new Response('');
-      // var_dump($zip_filename);die;
 
-      $msg = \Drupal::messenger()->addError('There are no solutions in this experiment to download.');
-//return new Response('', Response::HTTP_NO_CONTENT);
-
-      // RedirectResponse('lab-migration/lab-migration-run');
-      // $response = new RedirectResponse('/lab-migration/lab-migration-run');
-// $response->send();
-return $msg;
-    }
+    @unlink($zip_filename);
+    $this->messenger->addError($this->t('There are no solutions in this experiment to download.'));
+    return new RedirectResponse(Url::fromRoute('lab_migration.run_form')->toString());
   }
 
   public function lab_migration_download_lab() {
@@ -1286,7 +1287,7 @@ $root_path = \Drupal::service("lab_migration_global")->lab_migration_path();
     $zip->close();
 // var_dump($user->uid);die;
     if ($zip_file_count > 0) {
-      if ($user->uid) {
+      if ($user->id()) {
         
         /* download zip file */
         header('Content-Type: application/zip');
@@ -1731,146 +1732,6 @@ public function lab_migration_download_syllabus_copy() {
   return $response;
 }
 
-  function lab_migration_upload_code_form($form,$form_state)
-  {
-   
-    global $user;
-  
-    $proposal_data = lab_migration_get_proposal();
-    if (!$proposal_data) {
-        drupal_goto('');
-        return;
-    }
-  
-    /* add javascript for dependency selection effects */
-    $dep_selection_js = "(function ($) {
-    //alert('ok');
-      $('#edit-existing-depfile-dep-lab-title').change(function() {
-        var dep_selected = '';   
-   
-        /* showing and hiding relevant files */
-       $('.form-checkboxes .option').hide();
-        $('.form-checkboxes .option').each(function(index) {
-          var activeClass = $('#edit-existing-depfile-dep-lab-title').val();
-          consloe.log(activeClass);
-          if ($(this).children().hasClass(activeClass)) {
-            $(this).show();
-          }
-          if ($(this).children().attr('checked') == true) {
-            dep_selected += $(this).children().next().text() + '<br />';
-          }
-        });
-        /* showing list of already existing dependencies */
-        $('#existing_depfile_selected').html(dep_selected);
-      });
-  
-      $('.form-checkboxes .option').change(function() {
-        $('#edit-existing-depfile-dep-lab-title').trigger('change');
-      });
-      $('#edit-existing-depfile-dep-lab-title').trigger('change');
-    }(jQuery));";
-    drupal_add_js($dep_selection_js, 'inline', 'header');
-  
-    $form['#attributes'] = array('enctype' => "multipart/form-data");
-  
-    $form['lab_title'] = array(
-      '#type' => 'item',
-      '#markup' => $proposal_data->lab_title,
-      '#title' => t('Title of the Lab'),
-    );
-    $form['name'] = array(
-      '#type' => 'item',
-      '#markup' => $proposal_data->name_title . ' ' . $proposal_data->name,
-      '#title' => t('Proposer Name'),
-    );
-  
-    /* get experiment list */
-    $experiment_rows = array();
-    //$experiment_q = db_query("SELECT * FROM {lab_migration_experiment} WHERE proposal_id = %d ORDER BY id ASC", $proposal_data->id);
-    $query = db_select('lab_migration_experiment');
-                  $query->fields('lab_migration_experiment');
-                  $query->condition('proposal_id', $proposal_data->id);
-                  $query->orderBy('id', 'ASC');
-                  $experiment_q = $query->execute();
-    while ($experiment_data = $experiment_q->fetchObject())
-    {
-      $experiment_rows[$experiment_data->id] = $experiment_data->number . '. ' . $experiment_data->title;
-    }
-    $form['experiment'] = array(
-      '#type' => 'select',
-      '#title' => t('Title of the Experiment'),
-      '#options' => $experiment_rows,
-      '#multiple' => FALSE,
-      '#size' => 1,
-      '#required' => TRUE,
-    );
-  
-    $form['code_number'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Code No'),
-      '#size' => 5,
-      '#maxlength' => 10,
-      '#description' => t(""),
-      '#required' => TRUE,
-    );
-    $form['code_caption'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Caption'),
-      '#size' => 40,
-      '#maxlength' => 255,
-      '#description' => t(''),
-      '#required' => TRUE,
-    );
-    $form['os_used'] = array(
-      '#type' => 'select',
-      '#title' => t('Operating System used'),
-      '#options' => array(
-        'Linux' => 'Linux',
-        'Windows' => 'Windows',
-        'Mac' => 'Mac'
-      ),
-      '#required' => TRUE,
-    );
-    $form['dwsim_version'] = [
-      '#type' => 'select',
-      '#title' => t('R version used'),
-      '#options' => _lm_list_of_software_version(),
-      '#required' => TRUE,
-    ];
-    $form['toolbox_used'] = array(
-      '#type' => 'hidden',
-      '#title' => t('Toolbox used (If any)'),
-  '#default_value'=>'none',
-    );
-    $form['code_warning'] = array(
-      '#type' => 'item',
-      '#title' => t('Upload all the r project files in .zip format'),
-      '#prefix' => '<div style="color:red">',
-      '#suffix' => '</div>',
-    );
-    $form['sourcefile'] = array(
-      '#type' => 'fieldset',
-      '#title' => t('Main or Source Files'),
-      '#collapsible' => FALSE,
-      '#collapsed' => FALSE,
-    );
-    $form['sourcefile']['sourcefile1'] = array(
-        '#type' => 'file',
-        '#title' => t('Upload main or source file'),
-        '#size' => 48,
-        '#description' => t('Only alphabets and numbers are allowed as a valid filename.') . '<br />' .
-        t('Allowed file extensions: ') . variable_get('lab_migration_source_extensions', ''),
-    );
-  
-   /* $form['dep_files'] = array(
-      '#type' => 'item',
-      '#title' => t('Dependency Files'),
-    );*/
-  
-}
-
-
-
 public function lab_migration_list_experiments() {
   // Get proposal data.
   $proposal_data = \Drupal::service("lab_migration_global")->lab_migration_get_proposal();
@@ -1976,12 +1837,11 @@ public function lab_migration_list_experiments() {
 public function lab_migration_completed_labs_all() {
   $output = [];
 
-  // Prepare the database query to fetch approved lab migration proposals.
-  $query = Database::getConnection()->select('lab_migration_proposal', 'lmp');
-  $query->fields('lmp');
-  $query->condition('approval_status', 3);
-  $query->orderBy('approval_date', 'DESC');
-  $result = $query->execute();
+  $result = $this->database->select('lab_migration_proposal', 'lmp')
+    ->fields('lmp')
+    ->condition('approval_status', 3)
+    ->orderBy('approval_date', 'DESC')
+    ->execute();
 
   // Fetch all rows into an array for easy counting and iteration.
   $rows = $result->fetchAll();
@@ -2031,7 +1891,7 @@ public function lab_migration_completed_labs_all() {
   // return new Response($rendered_output);
 }
 public function _list_all_lm_certificates() {
-  $query = Database::getConnection()->query("SELECT * FROM {lab_migration_certificate}");
+  $query = $this->database->query("SELECT * FROM {lab_migration_certificate}");
   $search_rows = [];
 
   $details_list = $query->fetchAll();
@@ -2065,153 +1925,16 @@ public function _list_all_lm_certificates() {
       '#empty' => t('No certificates found.'),
   ];
 }
-function ajax_get_lm_city_list_callback($form, $form_state)
-{
-    $state_default_value = $form_state['values']['all_state'];
-    $district_default_value = $form_state['values']['district'];
-    if ($district_default_value != '0')
-    {
-        $form['city']['#options'] = _lab_migration_list_of_cities($state_default_value, $district_default_value);
-        $commands[] = ajax_command_replace("#ajax-city-list-replace", drupal_render($form['city']));
-        $form['pincode']['#options'] =  array('0' => '- Select -');
-        $commands[] = ajax_command_replace("#ajax-pincode-list-replace", drupal_render($form['pincode']));
-    }else{
-        $form['city']['#options'] = array('0' => '- Select -');
-        $commands[] = ajax_command_replace("#ajax-city-list-replace", drupal_render($form['city']));
-    }
-    return array(
-        '#type' => 'ajax',
-        '#commands' => $commands
-    );
-}
-function ajax_get_lm_district_list_callback($form, $form_state)
-{
-    $state_default_value = $form_state['values']['all_state'];
-    if ($state_default_value != '0')
-    {
-        $form['district']['#options'] = _lab_migration_list_of_district($state_default_value);
-        $commands[] = ajax_command_replace("#ajax-district-list-replace", drupal_render($form['district']));
-        $form['pincode']['#options'] =  array('0' =>'- Select -');
-        $commands[] = ajax_command_replace("#ajax-pincode-list-replace", drupal_render($form['pincode']));
-        $form['city']['#options'] = array('0' => '- Select -');
-        $commands[] = ajax_command_replace("#ajax-city-list-replace", drupal_render($form['city']));
-    }else{
-        $form['district']['#options'] = array('0' => '- Select -');
-        $commands[] = ajax_command_replace("#ajax-district-list-replace", drupal_render($form['district']));
-        $form['pincode']['#options'] =  array('0' =>'- Select -');
-        $commands[] = ajax_command_replace("#ajax-pincode-list-replace", drupal_render($form['pincode']));
-        $form['city']['#options'] = array('0' => '- Select -');
-        $commands[] = ajax_command_replace("#ajax-city-list-replace", drupal_render($form['city']));
-    }
-    return array(
-        '#type' => 'ajax',
-        '#commands' => $commands
-    );
-}
-function ajax_get_lm_city_pincode_list_callback($form, $form_state)
-{
-    $city_default_value = $form_state['values']['city'];
-    $state_default_value = $form_state['values']['all_state'];
-    $district_default_value = $form_state['values']['district'];
-    if ($city_default_value != '0')
-    {
-        $form['pincode']['#options'] = _lab_migration_list_of_city_pincode($city_default_value,$state_default_value,$district_default_value);
-        $commands[] = ajax_command_replace("#ajax-pincode-list-replace", drupal_render($form['pincode']));
-    }else{
-        $form['pincode']['#options'] =  array('0' => '- Select -');
-        $commands[] = ajax_command_replace("#ajax-pincode-list-replace", drupal_render($form['pincode']));
-    }
-    return array(
-        '#type' => 'ajax',
-        '#commands' => $commands
-    );
-}
+  // ajax_get_lm_city_list_callback(), ajax_get_lm_district_list_callback(),
+  // ajax_get_lm_city_pincode_list_callback() removed — D7 AJAX APIs
+  // (ajax_command_replace, drupal_render) removed in Drupal 8.
+  // AJAX is now handled via Form::ajaxCallback() in the relevant Form classes.
 
-function lab_migration_category_edit_form(array $form, FormStateInterface $form_state) {
-  // Retrieve the current proposal ID from the route.
-  $route_match = \Drupal::routeMatch();
-  $proposal_id = (int) $route_match->getParameter('id');
+  // lab_migration_upload_code_form() removed — D7 Form API (db_select,
+  // drupal_add_js, variable_get, drupal_goto) removed. Handled by
+  // \Drupal\lab_migration\Form\LabMigrationUploadCodeForm.
 
-  // Fetch the proposal data.
-  $query = \Drupal::database()->select('lab_migration_proposal', 'p');
-  $query->fields('p');
-  $query->condition('id', $proposal_id);
-  $proposal_data = $query->execute()->fetchObject();
-
-  if (!$proposal_data) {
-    // Handle invalid proposals with an error message and redirect.
-    \Drupal::messenger()->addError(t('Invalid proposal selected. Please try again.'));
-    $url = Url::fromRoute('lab-migration.manage_proposal')->toString();
-    return new RedirectResponse($url);
-  }
-
-  // Build the form.
-  $user = User::load($proposal_data->uid);
-
-  $form['name'] = [
-    '#type' => 'item',
-    '#markup' => \Drupal::l(
-      $proposal_data->name_title . ' ' . $proposal_data->name,
-      Url::fromRoute('entity.user.canonical', ['user' => $proposal_data->uid])
-    ),
-    '#title' => t('Name'),
-  ];
-
-  $form['email_id'] = [
-    '#type' => 'item',
-    '#markup' => $user ? $user->getEmail() : t('Unknown'),
-    '#title' => t('Email'),
-  ];
-
-  $form['contact_ph'] = [
-    '#type' => 'item',
-    '#markup' => $proposal_data->contact_ph,
-    '#title' => t('Contact No.'),
-  ];
-
-  $form['department'] = [
-    '#type' => 'item',
-    '#markup' => $proposal_data->department,
-    '#title' => t('Department/Branch'),
-  ];
-
-  $form['university'] = [
-    '#type' => 'item',
-    '#markup' => $proposal_data->university,
-    '#title' => t('University/Institute'),
-  ];
-
-  $form['lab_title'] = [
-    '#type' => 'item',
-    '#markup' => $proposal_data->lab_title,
-    '#title' => t('Title of the Lab'),
-  ];
-
-  $form['category'] = [
-    '#type' => 'select',
-    '#title' => t('Category'),
-    '#options' => _lm_list_of_departments(), // Replace with the correct department list function.
-    '#required' => TRUE,
-    '#default_value' => $proposal_data->category,
-  ];
-
-  $form['actions']['submit'] = [
-    '#type' => 'submit',
-    '#value' => t('Submit'),
-  ];
-
-  $form['actions']['cancel'] = [
-    '#type' => 'link',
-    '#title' => t('Cancel'),
-    '#url' => Url::fromRoute('lab-migration.manage_proposal_category'),
-    '#attributes' => ['class' => ['button']],
-  ];
-
-  return $form;
-}
-
-
-
+  // lab_migration_category_edit_form() removed — \Drupal::l() removed D9.
+  // Handled by \Drupal\lab_migration\Form\LabMigrationCategoryEditForm.
 
 }
-?>

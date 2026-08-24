@@ -567,39 +567,24 @@ case 'solution_uploaded':
   /* Site name */
   $site_name = \Drupal::config('system.site')->get('name');
 
-  /* Headers */
+  /* Headers — normalise Cc/Bcc to prevent str_getcsv() fatal error */
   $headers = $params['solution_uploaded']['headers'] ?? [];
-
-  /* Prevent str_getcsv() fatal error */
   if (isset($headers['Cc']) && is_array($headers['Cc'])) {
     $headers['Cc'] = implode(',', $headers['Cc']);
   }
   if (isset($headers['Bcc']) && is_array($headers['Bcc'])) {
     $headers['Bcc'] = implode(',', $headers['Bcc']);
   }
+  $message['headers'] = $headers;
 
-$message['headers'] = $headers;
-
-  $message['subject'] = t('[@site] Your Lab migration solution proposal has been received', [
+  /* Subject */
+  $message['subject'] = t('[@site] You have uploaded Lab migration solution', [
     '@site' => $site_name,
   ]);
 
-/* VERY IMPORTANT: clear default body */
-
-$$user_data = User::load($params['solution_uploaded']['user_id']);
-
-$site_name = \Drupal::config('system.site')->get('name');
-
-$message['headers'] = $params['solution_uploaded']['headers'];
-
-$message['subject'] = t('[@site] You have uploaded Lab migration solution', [
-  '@site' => $site_name,
-]);
-
-// IMPORTANT: Reset body to avoid duplicated templates
-$message['body'] = [];
-
-$message['body'][] = t(
+  /* Body */
+  $message['body'] = [];
+  $message['body'][] = t(
 "Dear @name,
 
 You have uploaded the following solution:
@@ -615,15 +600,15 @@ Best Wishes,
 
 @site Team
 FOSSEE, IIT Bombay",
-[
-  '@site'   => $site_name,
-  '@name'        => $proposal_data->solution_provider_name,
-  '@experiment' => $experiment_data->title,
-  '@solution_no'=> $solution_data->code_number,
-  '@caption'    => $solution_data->caption,
-]);
+  [
+    '@site'        => $site_name,
+    '@name'        => $proposal_data->solution_provider_name,
+    '@experiment'  => $experiment_data->title,
+    '@solution_no' => $solution_data->code_number,
+    '@caption'     => $solution_data->caption,
+  ]);
 
-break;
+  break;
 
 case 'solution_proposal_received':
 
@@ -682,7 +667,7 @@ Dear @provider,
 We have received your proposal for providing solution for lab migration with the following details:
 
 List of experiments:
-!experiments
+@experiments
 
 Full Name: @fullname
 Email: @email
@@ -699,14 +684,14 @@ Best Wishes,
 
 @site Team
 FOSSEE, IIT Bombay', [
-    '@site'  => $site_name,
-    '@provider'  => $proposal_data->solution_provider_name,
+    '@site'        => $site_name,
+    '@provider'    => $proposal_data->solution_provider_name,
     '@experiments' => $experiment_list,
-    '@fullname'  => $proposal_data->solution_provider_name_title . ' ' . $proposal_data->solution_provider_name,
-    '@email'     => $user_data?->getEmail() ?? '',
-    '@phone'     => $proposal_data->solution_provider_contact_ph,
-    '@department'=> $proposal_data->department,
-    '@university'=> $proposal_data->solution_provider_university,
+    '@fullname'    => $proposal_data->solution_provider_name_title . ' ' . $proposal_data->solution_provider_name,
+    '@email'       => $user_data?->getEmail() ?? '',
+    '@phone'       => $proposal_data->solution_provider_contact_ph,
+    '@department'  => $proposal_data->department,
+    '@university'  => $proposal_data->solution_provider_university,
   ]);
 
   break;

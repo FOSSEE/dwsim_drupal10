@@ -9,19 +9,41 @@ namespace Drupal\custom_model\Form;
 
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\Element;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Drupal\Core\Url;
 use Drupal\Core\Link;
-use Drupal\user\Entity\User;
-use Symfony\Component\HttpFoundation\Response;
+use Drupal\Core\Database\Connection;
+use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
-use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Mail\MailManagerInterface;
-use Drupal\Core\DependencyInjection\ContainerInterface;
-use Drupal\Core\Mail\MailManager;
-use Drupal\Core\Session\AccountProxy;
+use Drupal\Core\Session\AccountInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 class CustomModelProposalStatusForm extends FormBase {
+
+  protected $connection;
+  protected $messenger;
+  protected $currentUser;
+  protected $routeMatch;
+
+  public function __construct(
+    Connection $connection,
+    MessengerInterface $messenger,
+    AccountInterface $currentUser,
+    RouteMatchInterface $routeMatch
+  ) {
+    $this->connection  = $connection;
+    $this->messenger   = $messenger;
+    $this->currentUser = $currentUser;
+    $this->routeMatch  = $routeMatch;
+  }
+
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('database'),
+      $container->get('messenger'),
+      $container->get('current_user'),
+      $container->get('current_route_match')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -31,30 +53,15 @@ class CustomModelProposalStatusForm extends FormBase {
   }
 
   public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
-    /* get current proposal */
-    // $proposal_id = (int) arg(3);
-    $route_match = \Drupal::routeMatch();
-    $proposal_id = (int) $route_match->getParameter('id');
-    
-    $query = \Drupal::database()->select('custom_model_proposal');
-    $query->fields('custom_model_proposal');
-    $query->condition('id', $proposal_id);
-    $proposal_q = $query->execute();
-    if ($proposal_q) {
-      if ($proposal_data = $proposal_q->fetchObject()) {
-        /* everything ok */
-      } //$proposal_data = $proposal_q->fetchObject()
-      else {
-        \Drupal::messenger()->addMessage(t('Invalid proposal selected. Please try again.'), 'error');
-        // drupal_goto('custom-model/manage-proposal');
-        return;
-      }
-    } //$proposal_q
-    else {
-      \Drupal::messenger()->addMessage(t('Invalid proposal selected. Please try again.'), 'error');
-      // drupal_goto('custom-model/manage-proposal');
-      return;
+    $proposal_id = (int) $this->routeMatch->getParameter('id');
+    $proposal_data = $this->connection->select('custom_model_proposal')
+      ->fields('custom_model_proposal')
+      ->condition('id', $proposal_id)
+      ->execute()
+      ->fetchObject();
+    if (!$proposal_data) {
+      $this->messenger->addError($this->t('Invalid proposal selected. Please try again.'));
+      return [];
     }
     $form['contributor_name'] = [
       '#type' => 'item',
@@ -188,14 +195,12 @@ class CustomModelProposalStatusForm extends FormBase {
     // $user = \Drupal::currentUser();
     /* get current proposal */
     // $proposal_id = (int) arg(3);
-      $proposal_id = (int) \Drupal::routeMatch()->getParameter('id'); // ✅ Needed!
-      $user = \Drupal::currentUser();
-    
-    //$proposal_q = \Drupal::database()->query("SELECT * FROM {custom_model_proposal} WHERE id = %d", $proposal_id);
-    $query = \Drupal::database()->select('custom_model_proposal');
-    $query->fields('custom_model_proposal');
-    $query->condition('id', $proposal_id);
-    $proposal_q = $query->execute();
+    $proposal_id = (int) $this->routeMatch->getParameter('id');
+    $proposal_data = $this->connection->select('custom_model_proposal')
+      ->fields('custom_model_proposal')
+      ->condition('id', $proposal_id)
+      ->execute()
+      ->fetchObject();
     // if ($proposal_q) {
     //   if ($proposal_data = $proposal_q->fetchObject()) {
     //     /* everything ok */
@@ -219,44 +224,10 @@ class CustomModelProposalStatusForm extends FormBase {
         ":proposal_id" => $proposal_id,
         ":expected_completion_date" => time(),
       ];
-      $result = \Drupal::database()->query($up_query, $args);
-      // CreateReadmeFileCustomModel($proposal_id);
-      // if (!$result) {
-      //   \Drupal::messenger()->addMessage('Error in update status', 'error');
-      //   return;
-      // } //!$result
-		/* sending email */
-      // $user_data = User::load($proposal_data->uid);
-      // $email_to = $user_data->mail;
-      // $from = variable_get('custom_model_from_email', '');
-      // $bcc = $user->mail . ', ' . variable_get('custom_model_emails', '');
-      // $cc = variable_get('custom_model_cc_emails', '');
-      // $params['custom_model_proposal_completed']['proposal_id'] = $proposal_id;
-      // $params['custom_model_proposal_completed']['user_id'] = $proposal_data->uid;
-      // $params['custom_model_proposal_completed']['headers'] = [
-      //   'From' => $from,
-      //   'MIME-Version' => '1.0',
-      //   'Content-Type' => 'text/plain; charset=UTF-8; format=flowed; delsp=yes',
-      //   'Content-Transfer-Encoding' => '8Bit',
-      //   'X-Mailer' => 'Drupal',
-      //   'Cc' => $cc,
-      //   'Bcc' => $bcc,
-      // ];
-      // if (!drupal_mail('custom_model', 'custom_model_proposal_completed', $email_to, language_default(), $params, $from, TRUE)) {
-      //   \Drupal::messenger()->addMessage('Error sending email message.', 'error');
-      // }
-      \Drupal::messenger()->addMessage('Congratulations! Custom Model proposal has been marked as completed. User has been notified of the completion.', 'status');
+      $result = $this->connection->query($up_query, $args);
+      $this->messenger->addStatus($this->t('Congratulations! Custom Model proposal has been marked as completed. User has been notified of the completion.'));
     }
-    // drupal_goto('custom-model/manage-proposal');
-    // RedirectResponse('lab-migration/manage-proposal');
-    $response = new RedirectResponse(Url::fromRoute('custom_model.proposal_all')->toString());
-  
-    // //   // Send the redirect response
-      $response->send();
-  
-
-    return;
-
+    $form_state->setRedirectUrl(Url::fromRoute('custom_model.proposal_all'));
   }
 
 }

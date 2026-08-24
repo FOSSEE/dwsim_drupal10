@@ -27,15 +27,15 @@
 //  */
 function lab_migration_uninstall()
   {
-    // Remove tables.
-    drupal_uninstall_schema('lab_migration');
     // Remove variables
-    \Drupal::config('lab_migration.settings')->clear('lab_migration_emails')->save();
-    \Drupal::config('lab_migration.settings')->clear('lab_migration_from_email')->save();
-    \Drupal::config('lab_migration.settings')->clear('lab_migration_source_extensions')->save();
-    \Drupal::config('lab_migration.settings')->clear('lab_migration_dependency_extensions')->save();
-    \Drupal::config('lab_migration.settings')->clear('lab_migration_result_extensions')->save();
-    \Drupal::config('lab_migration.settings')->clear('lab_migration_xcos_extensions')->save();
+    \Drupal::configFactory()->getEditable('lab_migration.settings')
+      ->clear('lab_migration_emails')
+      ->clear('lab_migration_from_email')
+      ->clear('lab_migration_source_extensions')
+      ->clear('lab_migration_dependency_extensions')
+      ->clear('lab_migration_result_extensions')
+      ->clear('lab_migration_xcos_extensions')
+      ->save();
   }
 /**
  * Implementation of hook_schema().

@@ -24,8 +24,35 @@ use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\Database\Database;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Mail\MailManager;
+use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\dwsim_flowsheet\Services\AjaxHelper;
 
 class DwsimFlowsheetCompletedTabForm extends FormBase {
+
+  /**
+   * The ajax response helper service.
+   *
+   * @var \Drupal\dwsim_flowsheet\Services\AjaxHelper
+   */
+  protected $ajaxHelper;
+
+  /**
+   * Constructs a DwsimFlowsheetCompletedTabForm object.
+   *
+   * @param \Drupal\dwsim_flowsheet\Services\AjaxHelper $ajax_helper
+   */
+  public function __construct(AjaxHelper $ajax_helper) {
+    $this->ajaxHelper = $ajax_helper;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('dwsim_flowsheet.ajax_helper')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -66,8 +93,7 @@ class DwsimFlowsheetCompletedTabForm extends FormBase {
 
   
   public function ajax_example_autocheckboxes_callback(array &$form, FormStateInterface $form_state) {
-    $response = new AjaxResponse();
-    $flowsheet_project_default_value = $form_state->getValue('howmany_select'); // Correct form state access
+    $flowsheet_project_default_value = $form_state->getValue('howmany_select');
   
     if ($flowsheet_project_default_value != 0) {
       // Update the form options dynamically
@@ -76,19 +102,19 @@ class DwsimFlowsheetCompletedTabForm extends FormBase {
       // Example dynamic content
       $dynamic_content = $this->_flowsheet_details($flowsheet_project_default_value);
       
-      // Replace content dynamically
-      $response->addCommand(new HtmlCommand('#ajax-selected-flowsheet', $dynamic_content));
-      $response->addCommand(new ReplaceCommand('#ajax_selected_flowsheet_action', \Drupal::service('renderer')->render($form['howmany_select'])));
+      return $this->ajaxHelper->buildMultiCommandResponse([
+        '#ajax-selected-flowsheet' => ['type' => 'html', 'content' => $dynamic_content],
+        '#ajax_selected_flowsheet_action' => ['type' => 'replace', 'content' => $form['howmany_select']],
+      ]);
     } 
     else {
       // Reset the form state value to "Please select..."
       $form['howmany_select']['#options'] = ['Please select...' => 'Please select...'];
       
-      // Use DataCommand for JavaScript context
-      $response->addCommand(new DataCommand('#ajax_selected_flowsheet', 'form_state_value_select', $form_state->getValue('howmany_select')));
+      return $this->ajaxHelper->buildMultiCommandResponse([
+        '#ajax_selected_flowsheet' => ['type' => 'data', 'name' => 'form_state_value_select', 'value' => $form_state->getValue('howmany_select')],
+      ]);
     }
-  
-    return $response;
   }
   
   // public function ajax_example_autocheckboxes_callback(array &$form, FormStateInterface $form_state)

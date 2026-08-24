@@ -7,8 +7,20 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\Url;
 use Drupal\Core\Link;
+use Drupal\Core\Database\Connection;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 class DwsimCustomModelCompletedTabForm extends FormBase {
+
+  protected $connection;
+
+  public function __construct(Connection $connection) {
+    $this->connection = $connection;
+  }
+
+  public static function create(ContainerInterface $container) {
+    return new static($container->get('database'));
+  }
 
   public function getFormId() {
     return 'dwsim_custom_model_completed_tab_form';
@@ -47,7 +59,7 @@ class DwsimCustomModelCompletedTabForm extends FormBase {
 
   public function _custom_model_details_year_wise() {
     $custom_model_years = ['0' => $this->t('Please select...')];
-    $result = \Drupal::database()->query("SELECT DISTINCT FROM_UNIXTIME(actual_completion_date, '%Y') AS year FROM custom_model_proposal WHERE approval_status = 3 ORDER BY year DESC");
+    $result = $this->connection->query("SELECT DISTINCT FROM_UNIXTIME(actual_completion_date, '%Y') AS year FROM custom_model_proposal WHERE approval_status = 3 ORDER BY year DESC");
     foreach ($result as $record) {
       $year = $record->year;
       $custom_model_years[$year] = $year;
@@ -60,7 +72,7 @@ class DwsimCustomModelCompletedTabForm extends FormBase {
       return ['#markup' => $this->t('Please select a year to view completed custom model projects.')];
     }
 
-    $query = \Drupal::database()->select('custom_model_proposal', 'cmp');
+    $query = $this->connection->select('custom_model_proposal', 'cmp');
     $query->fields('cmp');
     $query->condition('approval_status', 3);
     $query->where("FROM_UNIXTIME(actual_completion_date, '%Y') = :year", [':year' => $year]);

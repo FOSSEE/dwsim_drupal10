@@ -598,11 +598,12 @@ function custom_model_permission()
 /* AJAX CALLS */
 function custom_model_ajax()
   {
-    $query_type = arg(2);
+    $path_parts = explode('/', trim(\Drupal::request()->getPathInfo(), '/'));
+    $query_type = $path_parts[2] ?? '';
     if ($query_type == 'chapter_title')
       {
-        $chapter_number = arg(3);
-        $preference_id = arg(4);
+        $chapter_number = $path_parts[3] ?? '';
+        $preference_id = $path_parts[4] ?? '';
         //$chapter_q = \Drupal::database()->query("SELECT * FROM {custom_model_chapter} WHERE number = %d AND preference_id = %d LIMIT 1", $chapter_number, $preference_id);
         $query = \Drupal::database()->select('custom_model_chapter');
         $query->fields('custom_model_chapter');
@@ -618,9 +619,9 @@ function custom_model_ajax()
       }
     else if ($query_type == 'example_exists')
       {
-        $chapter_number = arg(3);
-        $preference_id = arg(4);
-        $example_number = arg(5);
+        $chapter_number = $path_parts[3] ?? '';
+        $preference_id = $path_parts[4] ?? '';
+        $example_number = $path_parts[5] ?? '';
         $chapter_id = 0;
         $query = \Drupal::database()->select('custom_model_chapter');
         $query->fields('custom_model_chapter');
@@ -761,8 +762,8 @@ function _cm_list_of_pincodes()
 function _cm_dir_name($project, $proposar_name)
 {
 
-    $project_title = ucname($project);
-    $proposar_name = ucname($proposar_name);
+    $project_title = custom_model_ucname($project);
+    $proposar_name = custom_model_ucname($proposar_name);
     $dir_name = $project_title . ' By ' . $proposar_name;
     $directory_name = str_replace("__", "_", str_replace(" ", "_", str_replace("/", " ", $dir_name)));
     return $directory_name;
@@ -793,13 +794,13 @@ function cm_RenameDir($proposal_id, $dir_name)
         } //is_dir($files_id_dir)
         else
         {
-            \Drupal::messenger()->addMessage('Directory not available for rename.');
+            \Drupal::messenger()->addStatus('Directory not available for rename.');
             return;
         }
     } //$result != NULL
     else
     {
-        \Drupal::messenger()->addMessage('Project directory name not present in databse');
+        \Drupal::messenger()->addError('Project directory name not present in database.');
         return;
     }
     //var_dump($files);die;
@@ -865,10 +866,10 @@ function cm_rrmdir_project($prop_id)
             } //$objects as $object
             reset($objects);
             rmdir($dir);
-            $msg = \Drupal::messenger()->addMessage("Directory deleted successfully");
+            $msg = \Drupal::messenger()->addStatus("Directory deleted successfully");
             return $msg;
         } //is_dir($dir)
-        $msg = \Drupal::messenger()->addMessage("Directory not present");
+        $msg = \Drupal::messenger()->addStatus("Directory not present");
         return $msg;
     } //$proposal_data->id == $prop_id
     else
@@ -909,8 +910,8 @@ function custom_model_get_proposal()
     $proposal_data = $proposal_q->fetchObject();
     if (!$proposal_data)
       {
-        \Drupal::messenger()->addMessage("You do not have any approved custom model proposal. Please check the ");
-        drupal_goto('');
+        \Drupal::messenger()->addError("You do not have any approved custom model proposal.");
+        return FALSE;
       }
     switch ($proposal_data->approval_status)
     {
